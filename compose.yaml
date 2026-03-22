@@ -1,0 +1,69 @@
+services:
+  elastic:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.3.2
+    environment:
+      - node.name=es
+      - cluster.name=es-docker-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - ES_JAVA_OPTS=-Xms2g -Xmx2g
+      - xpack.security.enabled=false
+    volumes:
+      - elastic_data:/usr/share/elasticsearch/data
+    ports:
+      - 9200:9200
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  postgresql:
+    image: postgres:17-alpine3.22
+    restart: always
+    environment:
+        POSTGRES_DB: ${POSTGRES_DATABASE}
+        POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+        PGDATA: "/var/lib/postgresql/data/pgdata"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ${POSTGRES_DATABASE}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+    env_file:
+      - .env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    mem_limit: 256m
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+        POSTGRES_HOST: "postgresql"
+        DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD}@postgresql/${POSTGRES_DATABASE}
+        ELASTICSEARCH_URL: http://elastic:9200
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      elastic:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    develop:
+      watch:
+        - action: rebuild
+          path: ./src
+          ignore:
+            - src/**/__pycache__/
+
+volumes:
+  postgres_data:
+  elastic_data:
