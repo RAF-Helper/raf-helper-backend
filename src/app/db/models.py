@@ -1,6 +1,9 @@
-"""Database models - matching docs/postgres_schema.md"""
+"""Database models."""
 
-from sqlalchemy import Column, BigInteger, String, Text, ForeignKey, MetaData
+from sqlalchemy import (
+    Column, BigInteger, String, Text, ForeignKey, MetaData,
+    DateTime, Boolean, Integer,
+)
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.sql import func
 
@@ -9,29 +12,29 @@ Base = declarative_base(metadata=metadata)
 
 
 class User(Base):
-    """User model - stores Firebase auth ID."""
-
     __tablename__ = "users"
 
-    id = Column(BigInteger, primary_key=True, index=True)
-    firebase_id = Column(String(28), nullable=False, index=True)
+    id = Column(BigInteger, primary_key=True, autoincrement=True, index=True)
+    firebase_id = Column(String(128), nullable=False, unique=True, index=True)
+    email = Column(String(320), nullable=False, unique=True, index=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    # Relationships
     chats = relationship("Chat", back_populates="user", cascade="all, delete-orphan")
     files = relationship("FileMetadata", back_populates="user", cascade="all, delete-orphan")
 
 
 class Chat(Base):
-    """Chat session model."""
-
     __tablename__ = "chats"
 
-    id = Column(BigInteger, primary_key=True, index=True)
+    id = Column(BigInteger, primary_key=True, autoincrement=True, index=True)
     user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    title = Column(String(256), nullable=False, default="New Chat")
+    is_web_search_enabled = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    # Relationships
     user = relationship("User", back_populates="chats")
-    messages = relationship("ChatMessage", back_populates="chat", cascade="all, delete-orphan")
+    messages = relationship("ChatMessage", back_populates="chat", cascade="all, delete-orphan", order_by="ChatMessage.id")
     files = relationship(
         "FileMetadata",
         secondary="chat_context",
@@ -40,29 +43,31 @@ class Chat(Base):
 
 
 class ChatMessage(Base):
-    """Individual chat message."""
-
     __tablename__ = "chat_messages"
 
-    id = Column(BigInteger, primary_key=True, index=True)
+    id = Column(BigInteger, primary_key=True, autoincrement=True, index=True)
     chat_id = Column(BigInteger, ForeignKey("chats.id", ondelete="CASCADE"), nullable=False, index=True)
-    message_type = Column(String(5), nullable=False)  # user, system, assistant
+    role = Column(String(16), nullable=False)  # user | assistant | system
     content = Column(Text, nullable=False)
+    agent_used = Column(String(64), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    # Relationships
     chat = relationship("Chat", back_populates="messages")
 
 
 class FileMetadata(Base):
-    """Uploaded file metadata."""
-
     __tablename__ = "file_metadata"
 
-    id = Column(BigInteger, primary_key=True, index=True)
+    id = Column(BigInteger, primary_key=True, autoincrement=True, index=True)
     user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     path = Column(String(4096), nullable=False)
+    original_name = Column(String(512), nullable=False)
+    mime_type = Column(String(128), nullable=False, default="application/octet-stream")
+    size = Column(BigInteger, nullable=False, default=0)
+    is_indexed = Column(Boolean, nullable=False, default=False)
+    chunk_count = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    # Relationships
     user = relationship("User", back_populates="files")
     chats = relationship(
         "Chat",

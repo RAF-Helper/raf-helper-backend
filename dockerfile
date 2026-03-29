@@ -14,7 +14,9 @@ COPY src/ ./src/
 
 # Install uv and dependencies
 RUN pip install uv
-RUN uv sync --all-extras --dev
+RUN uv sync
+
+RUN mkdir -p /app/storage
 
 EXPOSE 8000
 

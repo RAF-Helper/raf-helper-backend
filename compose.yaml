@@ -43,11 +43,12 @@ services:
   backend:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: dockerfile
     environment:
         POSTGRES_HOST: "postgresql"
-        DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD}@postgresql/${POSTGRES_DATABASE}
+        DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@postgresql/${POSTGRES_DATABASE}
         ELASTICSEARCH_URL: http://elastic:9200
+        STORAGE_PATH: /app/storage
     depends_on:
       postgresql:
         condition: service_healthy
@@ -55,6 +56,8 @@ services:
         condition: service_healthy
     ports:
       - "8000:8000"
+    volumes:
+      - backend_storage:/app/storage
     env_file:
       - .env
     develop:
@@ -67,3 +70,4 @@ services:
 volumes:
   postgres_data:
   elastic_data:
+  backend_storage:
