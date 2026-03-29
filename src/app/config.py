@@ -43,10 +43,13 @@ class Settings(BaseSettings):
     langfuse_secret_key: str = Field(default="", alias="LANGFUSE_SECRET_KEY")
     langfuse_host: str = "https://cloud.langfuse.com"
 
+    # File storage
+    storage_path: str = Field(default="./storage", alias="STORAGE_PATH")
+
     model_config = SettingsConfigDict(
-        env_file = ".env",
-        env_file_encoding = "utf-8",
-        extra='allow',
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="allow",
     )
 
 

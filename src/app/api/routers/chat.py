@@ -6,6 +6,7 @@ from typing import Optional
 
 from ..auth.firebase import verify_firebase_token
 from app.chat.orchestrator import Orchestrator
+from app.schemas.agent import AgentType, SummarizationMode
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -14,7 +15,7 @@ class ChatRequest(BaseModel):
     """Request model for chat endpoint."""
 
     message: str
-    agent: Optional[str] = None
+    agent: Optional[AgentType] = None
     context_material_ids: Optional[list[int]] = None
     use_web_search: bool = False
 
@@ -54,14 +55,18 @@ async def chat(
     try:
         response = await orchestrator.process(
             message=request.message,
-            user_id=user_id,
-            agent=request.agent,
-            context_material_ids=request.context_material_ids,
+            chat_id=0,  # stateless endpoint — no persistent chat session
+            user_id=0,
+            history=[],
+            file_ids=request.context_material_ids or [],
             use_web_search=request.use_web_search,
+            forced_agent=request.agent,
+            summarization_mode=SummarizationMode.default,
+            session=None,
         )
         return ChatResponse(
             response=response.content,
-            agent_used=response.agent_used,
+            agent_used=response.agent_used.value,
             metadata=response.metadata,
         )
     except Exception as e:
