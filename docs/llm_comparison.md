@@ -4,15 +4,16 @@
 
 ### Routing LLM Fallback
 
-- __Qwen Next 80B A3B Instruct__ due to instant low latency. Model small capabilities should not affect simple routing task.
-- ~~gpt-oss-120b~~ __gpt-oss-20b__ as a fallback. Suits the task perfectly and still has great latency. 
+- __Qwen Next 80B A3B Instruct__ due to instant low latency. Model small capabilities should not affect simple routing task;
+- __gpt-oss-120b__ as a fallback. Suits the task perfectly and still has great latency;
+- __gpt-oss-20b__ as a fallback.
 
 ### RAG Agents
 
 __Include__: Events agent, Staff agent, Support agent, QA Agent
 
-- ~~gpt-oss-120b due to good benchmark scores, low latency and full agentic support (tooling, reasoning, structured outputs)~~
-- __Nemotron 3 Super__ as a fallback, has agentic capabilities and good performance.
+- __gpt-oss-120b__ due to good benchmark scores, low latency and full agentic support (tooling, reasoning, structured outputs);
+- __Nemotron 3 Super__ as a fallback, has agentic capabilities and good performance;
 - __Qwen3.6 Plus Preview__ as a fallback, has agentic capabilities and good performance.
 
 
@@ -27,7 +28,7 @@ _Fallback TBD_.
 
 __Writers__:
 
-- __Nemotron 3 Super__ due to good capabilities, great window.
+- __Nemotron 3 Super__ due to good capabilities, great window;
 - __gpt-oss-120b__ as a fallback.
 
 __Planners, Summarizers, Reviewers__:
@@ -179,21 +180,19 @@ Data collection is not suitable for the most secret use cases, must be cautious 
 
 
 
-## ~~gpt-oss-120b~~
+## gpt-oss-120b
 
 __Provider is down, temporary not our case__
 
-__OR tag__: `nvidia/nemotron-3-super-120b-a12b:free`
-
-__The model collects prompt and completion data that can be used to improve the model.__
+__OR tag__: `openai/gpt-oss-120b:free`
 
 ### Reasoning
 
-Supports short reasoning providing for better answer quality.
+Supports reasoning providing for better answer quality.
 
 ### Context
 
-Works with 262K input and output tokens max.
+Works with 131K input and output tokens max.
 
 ### Tools
 
@@ -201,22 +200,18 @@ Supports tool calling, so is suitable for agentic cases.
 
 ### Performance
 
-- 4.5s First token latency.
-- 20 tokens per second.
+- <1s First token latency.
+- 30 tokens per second.
 
 __OR test__:
-- 2050 tokens / 107.0s (125.8s), long first token latency
+- 2050 tokens / 68.0s, long first token latency
 
 
 ### Use case
 
-Long inference latencies from provider are not perfect for quick responses so long-form tasks (abstraction and slides construction) are ok for that model. Decent context window (262k) and benchmark intelligence scores with supported reasoning also makes case to use that model for working with educational materials good choice.
+Short latencies and agentic capabilities makes this a perfect baseline choice for our agents. The model provides good performance with reasoning allowing for complex tasks. Lower parameter model _openai/gpt-oss-20b:free_ is available, providing similar characteristics but less intelligence.
 
-Data collection is not suitable for the most secret use cases, must be cautious about that.
-
-
-
-
+Also, providers for this model on OpenRouter are quite unstable, requiring decent fallback for this model.
 
 
 # Notes
