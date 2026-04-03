@@ -8,6 +8,7 @@ from .config import settings
 from .db.session import init_db, close_db
 from .elastic.client import ElasticsearchClient
 from .elastic.index_manager import ensure_indexes
+from .logging_config import setup_logging
 
 # Routers
 from .api.routers import health
@@ -17,11 +18,19 @@ from .api.routers.files import router as files_router
 from .api.routers.chats import router as chats_router
 from .api.routers.admin.staff import router as admin_staff_router
 from .api.routers.admin.events import router as admin_events_router
-
+from .api.routers.admin.elastic import router as admin_elastic_router
+import logging
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    setup_logging(
+        log_level=settings.debug and "DEBUG" or "INFO",
+        enable_console=settings.debug,
+    )
+    logging.info(f"Starting {settings.app_name} v{app.version}")
+    logging.info(f"Debug mode: {settings.debug}")
+
     await init_db()
     es = ElasticsearchClient.get()
     await ensure_indexes(es)
@@ -29,6 +38,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     await close_db()
     await ElasticsearchClient.close()
+    logging.info("Application shutdown complete")
 
 
 app = FastAPI(
@@ -53,3 +63,4 @@ app.include_router(files_router)
 app.include_router(chats_router)
 app.include_router(admin_staff_router)
 app.include_router(admin_events_router)
+app.include_router(admin_elastic_router)

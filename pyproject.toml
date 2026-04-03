@@ -28,5 +28,12 @@ dependencies = [
     "aiohttp>=3.13.3",
 ]
 
+[dependency-groups]
+dev = [
+    "pytest>=8.3.4",
+    "pytest-asyncio>=0.25.3",
+    "pytest-mock>=3.14.0",
+]
+
 [tool.uv]
 package = true

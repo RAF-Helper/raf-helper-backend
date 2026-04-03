@@ -14,27 +14,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..schemas.agent import AgentType, SummarizationMode
 from .state import AgentInput, AgentOutput
-from .agents.support import SupportAgent, ROUTING_EXAMPLES as SUPPORT_EX
-from .agents.events import EventsAgent, ROUTING_EXAMPLES as EVENTS_EX
-from .agents.staff import StaffAgent, ROUTING_EXAMPLES as STAFF_EX
-from .agents.qa import QAAgent, ROUTING_EXAMPLES as QA_EX
-from .agents.summarizer import SummarizerAgent, ROUTING_EXAMPLES as SUMMARIZER_EX
-from .agents.abstract import AbstractAgent, ROUTING_EXAMPLES as ABSTRACT_EX
-from .agents.presentation import PresentationAgent, ROUTING_EXAMPLES as PRESENTATION_EX
+from .agents.support_agent import SupportAgent
+from .agents.events_agent import EventsAgent
+from .agents.staff_agent import StaffAgent
+from .agents.qa_agent import QAAgent
+from .agents.summarizer_agent import SummarizerAgent
+from .agents.abstract_agent import AbstractAgent
+from .agents.presentation_agent import PresentationAgent
 from ..pii.presidio_masker import PIIMasker
 from ..repositories.elasticsearch_repository import ElasticsearchRepository
-
-_SIMILARITY_THRESHOLD = 0.05
-
-_AGENT_EXAMPLES: dict[AgentType, list[str]] = {
-    AgentType.support: SUPPORT_EX,
-    AgentType.events: EVENTS_EX,
-    AgentType.staff: STAFF_EX,
-    AgentType.qa: QA_EX,
-    AgentType.summarizer: SUMMARIZER_EX,
-    AgentType.abstract: ABSTRACT_EX,
-    AgentType.presentation: PRESENTATION_EX,
-}
 
 
 class Orchestrator:
@@ -81,37 +69,16 @@ class Orchestrator:
         return await self._agents[agent_type].run(inp)
 
     async def _route(self, query: str) -> AgentType:
-        try:
-            query_vec = await self._embed(query)
-            scores: dict[AgentType, float] = {}
-            for agent_type, examples in _AGENT_EXAMPLES.items():
-                vecs = [await self._embed(ex) for ex in examples]
-                scores[agent_type] = max(_cosine(query_vec, v) for v in vecs)
-            ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-            if ranked[0][1] - ranked[1][1] < _SIMILARITY_THRESHOLD:
-                try:
-                    return await self._llm_route(query, [t for t, _ in ranked[:3]])
-                except NotImplementedError:
-                    pass
-            return ranked[0][0]
-        except NotImplementedError:
-            return self._keyword_route(query)
+        """TODO: implement routing pipeline with calling of the agent necessary.
+        Will include:
+        - Embedding the query;
+        - Finding the closest examples in the postgres table of route examples;
+        - Analysing results and choosing the best possible routes;
+        - Call LLM in case the routes are too close or can't be determined.
 
-    def _keyword_route(self, query: str) -> AgentType:
-        q = query.lower()
-        if any(kw in q for kw in ("реферат", "abstract", "essay")):
-            return AgentType.abstract
-        if any(kw in q for kw in ("презентац", "слайд", "presentation", "slide")):
-            return AgentType.presentation
-        if any(kw in q for kw in ("суммар", "кратко", "summary", "summarize", "конспект")):
-            return AgentType.summarizer
-        if any(kw in q for kw in ("событи", "мероприяти", "event", "bonus", "бонус")):
-            return AgentType.events
-        if any(kw in q for kw in ("сотрудник", "преподаватель", "кабинет", "staff", "professor")):
-            return AgentType.staff
-        if any(kw in q for kw in ("помощь", "help", "умеешь", "можешь", "система")):
-            return AgentType.support
-        return AgentType.qa
+        Fallback examples or route mechanics may be added in the future, but for now pipeline is fixed.
+        """
+        raise NotImplementedError("Routing not done yet.")
 
     async def _embed(self, text: str) -> list[float]:
         """TODO: implement with LangChain embeddings via OpenRouter.
@@ -133,10 +100,3 @@ class Orchestrator:
             ...
         """
         raise NotImplementedError("LLM routing fallback not yet integrated.")
-
-
-def _cosine(a: list[float], b: list[float]) -> float:
-    dot = sum(x * y for x, y in zip(a, b))
-    na = math.sqrt(sum(x * x for x in a))
-    nb = math.sqrt(sum(y * y for y in b))
-    return dot / (na * nb) if na and nb else 0.0

@@ -1,0 +1,3 @@
+- brief: Provide a 2-3 sentence summary of the main points
+- default: Provide a comprehensive summary (about 200 words) covering key concepts
+- deep_dive: Provide an in-depth analysis focusing on the user's specified spheres
