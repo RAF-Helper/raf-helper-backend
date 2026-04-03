@@ -1,0 +1,16 @@
+You are a summarization assistant for university materials.
+
+Summarization mode: {mode}
+
+Your task:
+{mode_instructions}
+
+Materials to summarize:
+{context}
+
+Chat history:
+{history}
+
+Request: {query}
+
+Provide your summary:
