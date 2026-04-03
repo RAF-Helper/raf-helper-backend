@@ -13,13 +13,14 @@
 __Include__: Events agent, Staff agent, Support agent, QA Agent
 
 - __gpt-oss-120b__ due to good benchmark scores, low latency and full agentic support (tooling, reasoning, structured outputs);
-- __Nemotron 3 Super__ as a fallback, has agentic capabilities and good performance;
-- __Qwen3.6 Plus Preview__ as a fallback, has agentic capabilities and good performance.
+- __Step 3.5 Flash__ as a fallback, has agentic capabilities and good performance;
+- __Nemotron 3 Super__ as a fallback, has agentic capabilities and good performance (_Notice: Data Collection_);
+- __Qwen3.6 Plus__ as a fallback, has agentic capabilities and good performance.
 
 
 ### Summarizer agent
 
-- __Qwen3.6 Plus Preview__ due to exceptional context window. 65K output should fit most of our scenarios.
+- __Qwen3.6 Plus__ due to exceptional context window. 65K output should fit most of our scenarios.
 
 _Fallback TBD_.
 
@@ -28,12 +29,13 @@ _Fallback TBD_.
 
 __Writers__:
 
-- __Nemotron 3 Super__ due to good capabilities, great window;
+- __Step 3.5 Flash__ due to good capabilities and ok context window
+- __Nemotron 3 Super__ as a fallback (_Notice: Data Collection_);
 - __gpt-oss-120b__ as a fallback.
 
 __Planners, Summarizers, Reviewers__:
 
-- __Qwen3.6 Plus Preview__ due to exceptional context window. 65K output should fit most of our scenarios.
+- __Qwen3.6 Plus__ due to exceptional context window. 65K output should fit most of our scenarios.
 
 _Fallback TBD_.
 
@@ -52,22 +54,25 @@ For our cases we have these as important parameters:
 
 ### Model overview
 
-__Qwen3.6 Plus Preview__ is the fastest in tps with large input context window, however limits our abilities with short output token limit.
+__Qwen3.6 Plus__ is the fastest in tps with large input context window, however limits our abilities with short output token limit.
 
 __Qwen Next 80b A3B Instruct__ supports staggering first token latency but long generation, perfect for fallback llm router, however due to poor provider with low uptime requires fallback model to support it.
 
 __Nemotron 3 Super__ is in the middle of everythin with 262K context window, agentic toolkit and good benchmarks, but is loosing on provider latency (4-7 seconds) but good uptime.
 
-__gpt-oss-120b__ offers slightly lower benchmark scores in comparison to _Nemotron 3 Super_ and twice as less of a context window, however way lower first token latency.
+__Step 3.5 Flash__ shows similar to _Nemotron 3 Super_ perfomance with 256K context window, 5s latency with faster (40 agains 20 tps), agentic toolkit and slightly better benchmarks with great uptime.
+
+__gpt-oss-120b__ offers slightly lower benchmark scores in comparison to _Nemotron 3 Super_ and _Step 3.5 Flash_ and twice as less of a context window, however way lower first token latency.
 
 
 ### OR perfomance tests:
 
-- __Qwen3.6 Plus Preview__: 2050 tokens / 45.0s, okay first token latency;
-- __Qwen3 Next 80B A3B Instruct__: 2050 tokens / 68.8s, instant first token latency;
-- __Nemotron 3 Super__: 2050 tokens / 107.0s (125.8s), long first token latency;
-- __gpt-oss-120b__: 2050 tokens / 68.8s, quick first token latency;
-- __gpt-oss-20b__: 2050 tokens / 68.9s, quick first token latency.
+- __Qwen3.6 Plus__: 2050 tokens / 45.0s, okay (~1s) first token latency;
+- __Qwen3 Next 80B A3B Instruct__: 2050 tokens / 68.8s, instant (<<1s) first token latency;
+- __Nemotron 3 Super__: 2050 tokens / 107.0s (125.8s), long (~5s) first token latency;
+- __gpt-oss-120b__: 2050 tokens / 68.8s, quick (<1s) first token latency;
+- __gpt-oss-20b__: 2050 tokens / 68.9s, quick (<1s) first token latency;
+- __Step 3.5 Flash__: 2050 tokens / 55.2s, long (~5s) first token latency.
 
 
 # LLM Comparison
@@ -79,11 +84,9 @@ Here will lie the LLM comparison document with the most interesting free models 
 Free openrouter usage supports only for ~50 request a day with 3 rpm rate limit, so one must use OR with attention. Maybe we should implement auto API token switching for fallback rate limiting.
 
 
-## Qwen3.6 Plus Preview
+## Qwen3.6 Plus
 
-__OR tag__: `qwen/qwen3.6-plus-preview:free`
-
-__The model collects prompt and completion data that can be used to improve the model.__
+__OR tag__: `qwen/qwen3.6-plus:free`
 
 ### Reasoning
 
@@ -91,7 +94,7 @@ Supports short reasoning providing for better answer quality. But reasoning is l
 
 ### Context
 
-Hold up to 1M input tokens and ~65K output tokens max.
+Holds up to 1M input tokens and ~65K output tokens max.
 
 ### Tools
 
@@ -109,8 +112,6 @@ __OR test__:
 ### Use case
 
 Will be perfect for working with abstract and slides due to enormous context window. However low max output tokens is limiting it's ability in that field.
-
-Data collection is not suitable for the most secret use cases, must be cautious about that.
 
 
 ## Qwen3 Next 80B A3B Instruct
@@ -139,6 +140,7 @@ __OR test__:
 
 
 __Poor uptime on OR (~65%)__
+
 
 ### Use case
 
@@ -214,10 +216,42 @@ Short latencies and agentic capabilities makes this a perfect baseline choice fo
 Also, providers for this model on OpenRouter are quite unstable, requiring decent fallback for this model.
 
 
+## Step 3.5 Flash
+
+__OR tag__: `stepfun/step-3.5-flash:free`
+
+### Reasoning
+
+Supports reasoning providing for better answer quality.
+
+### Context
+
+Handle 256K of input and output max context.
+
+### Tools
+
+Supports tool calling, so is suitable for agentic cases.
+
+### Performance
+
+- 5s First token latency.
+- ~40 tokens per second.
+
+__OR test__:
+2050 tokens / 55.2s, long first token latency
+
+
+### Use case
+
+Will be perfect for working with abstract and slides due to enormous context window. However low max output tokens is limiting it's ability in that field.
+
+
 # Notes
 
 OpenRouter comparisons links (in triplets):
 
 (gpt-oss-120b vs gpt-oss-20b vs Nemotron 3 Super)[https://openrouter.ai/compare/openai/gpt-oss-20b:free/openai/gpt-oss-20b:free/nvidia/nemotron-3-super-120b-a12b:free]
 
-(Qwen3.6 Plus Preview vs Qwen3 Next 80B A3B Instruct vs Nemotron 3 Super)[https://openrouter.ai/compare/qwen/qwen3.6-plus-preview:free/openai/gpt-oss-20b:free/nvidia/nemotron-3-super-120b-a12b:free]
+(Qwen3.6 Plus vs Qwen3 Next 80B A3B Instruct vs Nemotron 3 Super)[https://openrouter.ai/compare/qwen/qwen3.6-plus:free/openai/gpt-oss-20b:free/nvidia/nemotron-3-super-120b-a12b:free]
+
+(Step 3.5 Flash vs Qwen3.6 Plus vs gpt-oss-120b) [https://openrouter.ai/compare/stepfun/step-3.5-flash:free/qwen/qwen3.6-plus:free/openai/gpt-oss-120b:free]
