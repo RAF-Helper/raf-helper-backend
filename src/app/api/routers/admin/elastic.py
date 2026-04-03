@@ -1,8 +1,11 @@
 """Admin endpoints for Elasticsearch configuration management."""
 
 import logging
+from elasticsearch import AsyncElasticsearch
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from pydantic import BaseModel, Field
+
+from app.elastic.index_manager import ensure_indexes
 
 from ....config import settings
 from ....elastic.client import ElasticsearchClient
@@ -15,7 +18,6 @@ router = APIRouter(prefix="/admin/elastic", tags=["admin", "elastic"])
 class ElasticsearchUpdateRequest(BaseModel):
     """Request to update Elasticsearch connection URL."""
     url: str = Field(..., description="New Elasticsearch URL (e.g., https://localhost:9200)")
-    password: str = Field(..., description="Admin password for authentication")
 
 
 def verify_admin_token(x_admin_token: str = Header(..., alias="X-Admin-Token")) -> str:
@@ -46,7 +48,7 @@ def verify_admin_token(x_admin_token: str = Header(..., alias="X-Admin-Token")) 
 async def update_elasticsearch_url(
     body: ElasticsearchUpdateRequest,
     admin_token: str = Depends(verify_admin_token),
-) -> dict[str, str]:
+):
     """
     Update the Elasticsearch connection URL and reconnect.
 
@@ -89,6 +91,8 @@ async def update_elasticsearch_url(
             f"Updated Elasticsearch URL from {old_url} to {body.url}"
         )
 
+        await ensure_indexes(new_client)
+
         return {
             "message": "Elasticsearch URL updated successfully",
             "old_url": old_url,
@@ -108,9 +112,7 @@ async def update_elasticsearch_url(
 
 
 @router.get("/status")
-async def get_elasticsearch_status(
-    admin_token: str = Depends(verify_admin_token),
-) -> dict[str, any]:
+async def get_elasticsearch_status():
     """
     Get current Elasticsearch connection status and configuration.
 
@@ -124,7 +126,7 @@ async def get_elasticsearch_status(
         ping = await client.ping()
 
         # Get index information
-        indices = await client.indices.get_alias(name="*")
+        indices = await client.indices.get_alias()
         index_names = list(indices.keys())
 
         return {

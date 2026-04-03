@@ -1,5 +1,7 @@
 """Elasticsearch index creation and mapping management."""
 
+import logging
+
 from elasticsearch import AsyncElasticsearch
 
 VECTOR_DIMS = 1536  # OpenAI-compatible embedding dimension (configurable)
@@ -111,6 +113,9 @@ CONTEXT_MATERIALS_MAPPING = {
 
 async def ensure_indexes(es: AsyncElasticsearch) -> None:
     """Create ES indexes with mappings if they don't already exist."""
+    if not await es.ping():
+        logging.error('ES not connected, no index created')
+        return
     indexes = {
         STAFF_INDEX: STAFF_MAPPING,
         EVENTS_INDEX: EVENTS_MAPPING,
@@ -120,3 +125,4 @@ async def ensure_indexes(es: AsyncElasticsearch) -> None:
         exists = await es.indices.exists(index=name)
         if not exists:
             await es.indices.create(index=name, body=body)
+    logging.info('Successfully created ES indexes')
