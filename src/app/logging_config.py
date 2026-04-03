@@ -92,12 +92,14 @@ def log_llm_request(
     messages_count: int,
     model: str,
     temperature: float,
+    is_fallback: bool = False,
     **kwargs,
 ) -> None:
     """Log an outgoing LLM request."""
     logger = get_llm_logger()
+    fallback_tag = " [FALLBACK]" if is_fallback else ""
     logger.info(
-        f"Request → {method} | model={model} | temp={temperature} | "
+        f"Request → {method}{fallback_tag} | model={model} | temp={temperature} | "
         f"messages={messages_count} | kwargs={kwargs}"
     )
 
@@ -109,14 +111,16 @@ def log_llm_response(
     usage: Optional[dict] = None,
     model: Optional[str] = None,
     duration_ms: Optional[float] = None,
+    is_fallback: bool = False,
 ) -> None:
     """Log an incoming LLM response."""
     logger = get_llm_logger()
+    fallback_tag = " [FALLBACK]" if is_fallback else ""
     usage_str = f" | usage={usage}" if usage else ""
     model_str = f" | model={model}" if model else ""
     duration_str = f" | {duration_ms:.1f}ms" if duration_ms else ""
     logger.info(
-        f"Response ← {method} | status={status} | len={content_length}"
+        f"Response ← {method}{fallback_tag} | status={status} | len={content_length}"
         f"{model_str}{usage_str}{duration_str}"
     )
 

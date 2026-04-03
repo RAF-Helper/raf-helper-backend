@@ -26,15 +26,47 @@ logger = logging.getLogger(__name__)
 class OpenRouterError(Exception):
     """Custom exception for OpenRouter client errors."""
 
-    def __init__(self, message: str, original_exception: Exception | None = None):
+    def __init__(self, message: str, original_exception: Exception | None = None, model: str | None = None):
         super().__init__(message)
         self.original_exception = original_exception
         self.message = message
+        self.model = model
 
     def __str__(self) -> str:
         if self.original_exception:
             return f"{self.message}: {self.original_exception}"
         return self.message
+
+
+def _is_retryable_error(error: Exception) -> bool:
+    """
+    Determine if an error is retryable (should trigger fallback).
+
+    Retryable errors include:
+    - Rate limits (429)
+    - Service unavailable (5xx)
+    - Timeouts
+    - Connection errors
+
+    Non-retryable:
+    - Authentication errors (401, 403)
+    - Invalid model (400)
+    - Content policy violations
+    """
+    error_type = type(error).__name__
+    error_msg = str(error).lower()
+
+    # LangChain exceptions that wrap HTTP errors
+    if "rate limit" in error_msg or "too many requests" in error_msg:
+        return True
+    if "service unavailable" in error_msg or "internal server error" in error_msg:
+        return True
+    if "timeout" in error_type.lower() or "timeout" in error_msg:
+        return True
+    if "connection" in error_type.lower() or "network" in error_msg:
+        return True
+
+    return False
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -53,10 +85,18 @@ class OpenRouterClient(BaseLLMClient):
     - Easy model switching
     """
 
-    def __init__(self):
+    def __init__(self, fallback_models: list[str] | None = None):
+        """
+        Initialize the OpenRouter client.
+
+        Args:
+            fallback_models: Optional list of fallback model names to try if primary fails.
+                           Example: ["anthropic/claude-3.5-sonnet", "openai/gpt-4-turbo"]
+        """
         self.api_key = settings.openrouter_api_key
         self.base_url = settings.openrouter_base_url
         self.default_model = settings.openrouter_model
+        self.fallback_models = fallback_models or []
 
         # Initialize the LangChain client
         self._client = ChatOpenRouter(
@@ -69,7 +109,7 @@ class OpenRouterClient(BaseLLMClient):
 
         logger.info(
             f"OpenRouterClient initialized with model={self.default_model}, "
-            f"base_url={self.base_url}"
+            f"base_url={self.base_url}, fallbacks={self.fallback_models or 'none'}"
         )
 
     def _convert_messages(
@@ -166,47 +206,55 @@ class OpenRouterClient(BaseLLMClient):
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
+        fallback_models: list[str] | None = None,
         **kwargs: Any,
     ) -> LLMResponse:
         """
-        Send chat completion request to OpenRouter.
+        Send chat completion request to OpenRouter with optional fallback.
 
         Args:
             messages: List of chat messages
             model: Model to use (overrides default if specified)
             temperature: Sampling temperature (0.0-2.0)
             max_tokens: Maximum tokens to generate
+            fallback_models: Additional models to try if primary fails (overrides instance fallbacks)
             **kwargs: Additional arguments passed to ChatOpenRouter
 
         Returns:
             LLMResponse with content, usage, and metadata
 
         Raises:
-            Exception: If API call fails
+            OpenRouterError: If all models fail
         """
         if not messages:
             raise ValueError("Messages list cannot be empty")
 
-        start_time = time.time()
-        model_used = model or self.default_model
-
-        # Log the request
-        log_llm_request(
-            method="chat",
-            messages_count=len(messages),
-            model=model_used,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            extra_kwargs=kwargs,
-        )
+        # Build list of models to try: specified model first, then fallbacks
+        primary_model = model or self.default_model
+        fallbacks = fallback_models if fallback_models is not None else self.fallback_models
+        models_to_try = [primary_model] + fallbacks
 
         converted_messages = self._convert_messages(messages)
+        last_error: Exception | None = None
 
-        # Create a temporary client with overridden parameters if needed
-        client = self._client
-        if model or temperature != 0.7 or max_tokens:
+        for attempt_idx, model_to_use in enumerate(models_to_try):
+            start_time = time.time()
+            is_fallback = attempt_idx > 0
+
+            # Log the request
+            log_llm_request(
+                method="chat",
+                messages_count=len(messages),
+                model=model_to_use,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                extra_kwargs=kwargs,
+                is_fallback=is_fallback,
+            )
+
+            # Create client for this model
             client = ChatOpenRouter(
-                model=model_used,
+                model=model_to_use,
                 api_key=self.api_key,
                 base_url=self.base_url,
                 temperature=temperature,
@@ -214,39 +262,87 @@ class OpenRouterClient(BaseLLMClient):
                 **kwargs,
             )
 
-        try:
-            response = await client.ainvoke(converted_messages)
-            built_response = self._build_response(response)
+            try:
+                response = await client.ainvoke(converted_messages)
+                built_response = self._build_response(response)
 
-            # Calculate duration and log success
-            duration_ms = (time.time() - start_time) * 1000
-            log_llm_response(
-                method="chat",
-                status="success",
-                content_length=len(built_response.content),
-                usage=built_response.usage,
-                model=built_response.model,
-                duration_ms=duration_ms,
-            )
+                # Calculate duration and log success
+                duration_ms = (time.time() - start_time) * 1000
+                log_llm_response(
+                    method="chat",
+                    status="success",
+                    content_length=len(built_response.content),
+                    usage=built_response.usage,
+                    model=built_response.model,
+                    duration_ms=duration_ms,
+                    is_fallback=is_fallback,
+                )
 
-            return built_response
+                if is_fallback:
+                    logger.warning(
+                        f"Chat succeeded with fallback model {model_to_use} "
+                        f"after {attempt_idx} attempt(s)"
+                    )
 
-        except LangChainException as e:
-            duration_ms = (time.time() - start_time) * 1000
-            log_llm_error(
-                method="chat",
-                error=e,
-                context={"model": model_used, "duration_ms": duration_ms},
-            )
-            raise OpenRouterError(f"OpenRouter API error: {e}", e) from e
-        except Exception as e:
-            duration_ms = (time.time() - start_time) * 1000
-            log_llm_error(
-                method="chat",
-                error=e,
-                context={"model": model_used, "duration_ms": duration_ms},
-            )
-            raise OpenRouterError(f"OpenRouter request failed: {e}", e) from e
+                return built_response
+
+            except LangChainException as e:
+                duration_ms = (time.time() - start_time) * 1000
+                last_error = e
+
+                log_llm_error(
+                    method="chat",
+                    error=e,
+                    context={
+                        "model": model_to_use,
+                        "duration_ms": duration_ms,
+                        "is_fallback": is_fallback,
+                        "attempt": attempt_idx + 1,
+                        "total_models": len(models_to_try),
+                    },
+                )
+
+                # Check if we should try next fallback
+                if _is_retryable_error(e) and attempt_idx < len(models_to_try) - 1:
+                    logger.warning(
+                        f"Chat failed with model {model_to_use} (attempt {attempt_idx + 1}), "
+                        f"trying fallback: {models_to_try[attempt_idx + 1] if attempt_idx + 1 < len(models_to_try) else 'none'}"
+                    )
+                    continue
+                else:
+                    # No more fallbacks or non-retryable error
+                    break
+
+            except Exception as e:
+                duration_ms = (time.time() - start_time) * 1000
+                last_error = e
+
+                log_llm_error(
+                    method="chat",
+                    error=e,
+                    context={
+                        "model": model_to_use,
+                        "duration_ms": duration_ms,
+                        "is_fallback": is_fallback,
+                    },
+                )
+
+                if _is_retryable_error(e) and attempt_idx < len(models_to_try) - 1:
+                    logger.warning(
+                        f"Chat failed with model {model_to_use}, "
+                        f"trying fallback: {models_to_try[attempt_idx + 1]}"
+                    )
+                    continue
+                else:
+                    break
+
+        # All models failed
+        raise OpenRouterError(
+            f"All models failed after {len(models_to_try)} attempts. "
+            f"Last error: {last_error}",
+            original_exception=last_error,
+            model=primary_model,
+        ) from last_error
 
     async def chat_with_tools(
         self,
@@ -254,6 +350,7 @@ class OpenRouterClient(BaseLLMClient):
         tools: list[dict[str, Any]],
         model: str | None = None,
         temperature: float = 0.7,
+        fallback_models: list[str] | None = None,
         **kwargs: Any,
     ) -> LLMResponse:
         """
@@ -264,6 +361,7 @@ class OpenRouterClient(BaseLLMClient):
             tools: List of tool definitions in OpenAI format
             model: Model to use
             temperature: Sampling temperature
+            fallback_models: Additional models to try if primary fails
             **kwargs: Additional arguments passed to ChatOpenRouter
 
         Returns:
@@ -274,69 +372,115 @@ class OpenRouterClient(BaseLLMClient):
         if not tools:
             raise ValueError("Tools list cannot be empty")
 
-        start_time = time.time()
-        model_used = model or self.default_model
-
-        # Log the request
-        log_llm_request(
-            method="chat_with_tools",
-            messages_count=len(messages),
-            model=model_used,
-            temperature=temperature,
-            tools_count=len(tools),
-            extra_kwargs=kwargs,
-        )
+        primary_model = model or self.default_model
+        fallbacks = fallback_models if fallback_models is not None else self.fallback_models
+        models_to_try = [primary_model] + fallbacks
 
         converted_messages = self._convert_messages(messages)
+        last_error: Exception | None = None
 
-        # Create client with tools bound
-        client = ChatOpenRouter(
-            model=model_used,
-            api_key=self.api_key,
-            base_url=self.base_url,
-            temperature=temperature,
-            **kwargs,
-        )
+        for attempt_idx, model_to_use in enumerate(models_to_try):
+            start_time = time.time()
+            is_fallback = attempt_idx > 0
 
-        # Bind tools using .bind_tools()
-        # LangChain accepts tools in OpenAI format or as Tool objects
-        client_with_tools = client.bind_tools(tools)
-
-        try:
-            response = await client_with_tools.ainvoke(converted_messages)
-            built_response = self._build_response(response)
-
-            # Calculate duration and log success
-            duration_ms = (time.time() - start_time) * 1000
-            tool_calls_count = len(built_response.metadata.get("tool_calls", [])) if built_response.metadata else 0
-
-            log_llm_response(
+            log_llm_request(
                 method="chat_with_tools",
-                status="success",
-                content_length=len(built_response.content),
-                usage=built_response.usage,
-                model=built_response.model,
-                duration_ms=duration_ms,
+                messages_count=len(messages),
+                model=model_to_use,
+                temperature=temperature,
+                is_fallback=is_fallback,
+                tools_count=len(tools),
+                extra_kwargs=kwargs,
             )
 
-            return built_response
+            # Create client with tools bound
+            client = ChatOpenRouter(
+                model=model_to_use,
+                api_key=self.api_key,
+                base_url=self.base_url,
+                temperature=temperature,
+                **kwargs,
+            )
+            client_with_tools = client.bind_tools(tools)
 
-        except LangChainException as e:
-            duration_ms = (time.time() - start_time) * 1000
-            log_llm_error(
-                method="chat_with_tools",
-                error=e,
-                context={"model": model_used, "tools": len(tools), "duration_ms": duration_ms},
-            )
-            raise OpenRouterError(f"OpenRouter API error: {e}", e) from e
-        except Exception as e:
-            duration_ms = (time.time() - start_time) * 1000
-            log_llm_error(
-                method="chat_with_tools",
-                error=e,
-                context={"model": model_used, "tools": len(tools), "duration_ms": duration_ms},
-            )
-            raise OpenRouterError(f"OpenRouter request failed: {e}", e) from e
+            try:
+                response = await client_with_tools.ainvoke(converted_messages)
+                built_response = self._build_response(response)
+
+                duration_ms = (time.time() - start_time) * 1000
+                log_llm_response(
+                    method="chat_with_tools",
+                    status="success",
+                    content_length=len(built_response.content),
+                    usage=built_response.usage,
+                    model=built_response.model,
+                    duration_ms=duration_ms,
+                    is_fallback=is_fallback,
+                )
+
+                if is_fallback:
+                    logger.warning(
+                        f"chat_with_tools succeeded with fallback model {model_to_use} "
+                        f"after {attempt_idx + 1} attempt(s)"
+                    )
+
+                return built_response
+
+            except LangChainException as e:
+                duration_ms = (time.time() - start_time) * 1000
+                last_error = e
+
+                log_llm_error(
+                    method="chat_with_tools",
+                    error=e,
+                    context={
+                        "model": model_to_use,
+                        "tools": len(tools),
+                        "duration_ms": duration_ms,
+                        "is_fallback": is_fallback,
+                        "attempt": attempt_idx + 1,
+                    },
+                )
+
+                if _is_retryable_error(e) and attempt_idx < len(models_to_try) - 1:
+                    logger.warning(
+                        f"chat_with_tools failed with model {model_to_use}, "
+                        f"trying fallback: {models_to_try[attempt_idx + 1]}"
+                    )
+                    continue
+                else:
+                    break
+
+            except Exception as e:
+                duration_ms = (time.time() - start_time) * 1000
+                last_error = e
+
+                log_llm_error(
+                    method="chat_with_tools",
+                    error=e,
+                    context={
+                        "model": model_to_use,
+                        "tools": len(tools),
+                        "duration_ms": duration_ms,
+                        "is_fallback": is_fallback,
+                    },
+                )
+
+                if _is_retryable_error(e) and attempt_idx < len(models_to_try) - 1:
+                    logger.warning(
+                        f"chat_with_tools failed with model {model_to_use}, "
+                        f"trying fallback: {models_to_try[attempt_idx + 1]}"
+                    )
+                    continue
+                else:
+                    break
+
+        raise OpenRouterError(
+            f"chat_with_tools: All models failed after {len(models_to_try)} attempts. "
+            f"Last error: {last_error}",
+            original_exception=last_error,
+            model=primary_model,
+        ) from last_error
 
     async def chat_stream(
         self,
@@ -344,6 +488,7 @@ class OpenRouterClient(BaseLLMClient):
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
+        fallback_models: list[str] | None = None,
         **kwargs: Any,
     ) -> AsyncIterator[str]:
         """
@@ -354,6 +499,7 @@ class OpenRouterClient(BaseLLMClient):
             model: Model to use
             temperature: Sampling temperature
             max_tokens: Maximum tokens to generate
+            fallback_models: Additional models to try if primary fails
             **kwargs: Additional arguments
 
         Yields:
@@ -365,63 +511,117 @@ class OpenRouterClient(BaseLLMClient):
         if not messages:
             raise ValueError("Messages list cannot be empty")
 
-        start_time = time.time()
-        model_used = model or self.default_model
-        total_chars = 0
+        primary_model = model or self.default_model
+        fallbacks = fallback_models if fallback_models is not None else self.fallback_models
+        models_to_try = [primary_model] + fallbacks
+        last_error: Exception | None = None
 
-        # Log the request
-        log_llm_request(
-            method="chat_stream",
-            messages_count=len(messages),
-            model=model_used,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            extra_kwargs=kwargs,
-        )
+        for attempt_idx, model_to_use in enumerate(models_to_try):
+            start_time = time.time()
+            is_fallback = attempt_idx > 0
 
-        converted_messages = self._convert_messages(messages)
-
-        client = ChatOpenRouter(
-            model=model_used,
-            api_key=self.api_key,
-            base_url=self.base_url,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            **kwargs,
-        )
-
-        try:
-            async for chunk in client.astream(converted_messages):
-                if hasattr(chunk, "content") and chunk.content:
-                    total_chars += len(chunk.content)
-                    yield chunk.content
-
-            # Log completion
-            duration_ms = (time.time() - start_time) * 1000
-            log_llm_response(
+            # Log the request
+            log_llm_request(
                 method="chat_stream",
-                status="success",
-                content_length=total_chars,
-                model=model_used,
-                duration_ms=duration_ms,
+                messages_count=len(messages),
+                model=model_to_use,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                extra_kwargs=kwargs,
+                is_fallback=is_fallback,
             )
 
-        except LangChainException as e:
-            duration_ms = (time.time() - start_time) * 1000
-            log_llm_error(
-                method="chat_stream",
-                error=e,
-                context={"model": model_used, "duration_ms": duration_ms},
+            converted_messages = self._convert_messages(messages)
+
+            client = ChatOpenRouter(
+                model=model_to_use,
+                api_key=self.api_key,
+                base_url=self.base_url,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                **kwargs,
             )
-            raise OpenRouterError(f"OpenRouter API error: {e}", e) from e
-        except Exception as e:
-            duration_ms = (time.time() - start_time) * 1000
-            log_llm_error(
-                method="chat_stream",
-                error=e,
-                context={"model": model_used, "duration_ms": duration_ms},
-            )
-            raise OpenRouterError(f"OpenRouter request failed: {e}", e) from e
+
+            try:
+                total_chars = 0
+                async for chunk in client.astream(converted_messages):
+                    if hasattr(chunk, "content") and chunk.content:
+                        total_chars += len(chunk.content)
+                        yield chunk.content
+
+                # Log completion
+                duration_ms = (time.time() - start_time) * 1000
+                log_llm_response(
+                    method="chat_stream",
+                    status="success",
+                    content_length=total_chars,
+                    model=model_to_use,
+                    duration_ms=duration_ms,
+                    is_fallback=is_fallback,
+                )
+
+                if is_fallback:
+                    logger.warning(
+                        f"chat_stream succeeded with fallback model {model_to_use} "
+                        f"after {attempt_idx + 1} attempt(s)"
+                    )
+                return
+
+            except LangChainException as e:
+                duration_ms = (time.time() - start_time) * 1000
+                last_error = e
+
+                log_llm_error(
+                    method="chat_stream",
+                    error=e,
+                    context={
+                        "model": model_to_use,
+                        "duration_ms": duration_ms,
+                        "is_fallback": is_fallback,
+                        "attempt": attempt_idx + 1,
+                        "total_models": len(models_to_try),
+                    },
+                )
+
+                if _is_retryable_error(e) and attempt_idx < len(models_to_try) - 1:
+                    logger.warning(
+                        f"chat_stream failed with model {model_to_use} (attempt {attempt_idx + 1}), "
+                        f"trying fallback: {models_to_try[attempt_idx + 1] if attempt_idx + 1 < len(models_to_try) else 'none'}"
+                    )
+                    continue
+                else:
+                    break
+
+            except Exception as e:
+                duration_ms = (time.time() - start_time) * 1000
+                last_error = e
+
+                log_llm_error(
+                    method="chat_stream",
+                    error=e,
+                    context={
+                        "model": model_to_use,
+                        "duration_ms": duration_ms,
+                        "is_fallback": is_fallback,
+                    },
+                )
+
+                if _is_retryable_error(e) and attempt_idx < len(models_to_try) - 1:
+                    logger.warning(
+                        f"chat_stream failed with model {model_to_use}, "
+                        f"trying fallback: {models_to_try[attempt_idx + 1]}"
+                    )
+                    continue
+                else:
+                    break
+
+        # All models failed
+        raise OpenRouterError(
+            f"chat_stream: All models failed after {len(models_to_try)} attempts. "
+            f"Last error: {last_error}",
+            original_exception=last_error,
+            model=primary_model,
+        ) from last_error
 
     async def chat_with_schema(
         self,
@@ -429,6 +629,7 @@ class OpenRouterClient(BaseLLMClient):
         schema: type[BaseModel],
         model: str | None = None,
         temperature: float = 0.7,
+        fallback_models: list[str] | None = None,
         **kwargs: Any,
     ) -> LLMResponse:
         """
@@ -439,6 +640,7 @@ class OpenRouterClient(BaseLLMClient):
             schema: Pydantic BaseModel class defining the output structure
             model: Model to use
             temperature: Sampling temperature
+            fallback_models: Additional models to try if primary fails
             **kwargs: Additional arguments
 
         Returns:
@@ -450,62 +652,116 @@ class OpenRouterClient(BaseLLMClient):
         if not messages:
             raise ValueError("Messages list cannot be empty")
 
-        start_time = time.time()
-        model_used = model or self.default_model
+        primary_model = model or self.default_model
+        fallbacks = fallback_models if fallback_models is not None else self.fallback_models
+        models_to_try = [primary_model] + fallbacks
+        last_error: Exception | None = None
 
-        # Log the request
-        log_llm_request(
-            method="chat_with_schema",
-            messages_count=len(messages),
-            model=model_used,
-            temperature=temperature,
-            schema=schema.__name__,
-            extra_kwargs=kwargs,
-        )
+        for attempt_idx, model_to_use in enumerate(models_to_try):
+            start_time = time.time()
+            is_fallback = attempt_idx > 0
 
-        converted_messages = self._convert_messages(messages)
-
-        client = ChatOpenRouter(
-            model=model_used,
-            api_key=self.api_key,
-            base_url=self.base_url,
-            temperature=temperature,
-            **kwargs,
-        )
-
-        # Enable structured output
-        structured_client = client.with_structured_output(schema)
-
-        try:
-            response = await structured_client.ainvoke(converted_messages)
-            built_response = self._build_response(response)
-
-            # Calculate duration and log success
-            duration_ms = (time.time() - start_time) * 1000
-            log_llm_response(
+            # Log the request
+            log_llm_request(
                 method="chat_with_schema",
-                status="success",
-                content_length=len(built_response.content),
-                usage=built_response.usage,
-                model=built_response.model,
-                duration_ms=duration_ms,
+                messages_count=len(messages),
+                model=model_to_use,
+                temperature=temperature,
+                schema=schema.__name__,
+                extra_kwargs=kwargs,
+                is_fallback=is_fallback,
             )
 
-            return built_response
+            converted_messages = self._convert_messages(messages)
 
-        except LangChainException as e:
-            duration_ms = (time.time() - start_time) * 1000
-            log_llm_error(
-                method="chat_with_schema",
-                error=e,
-                context={"model": model_used, "schema": schema.__name__, "duration_ms": duration_ms},
+            client = ChatOpenRouter(
+                model=model_to_use,
+                api_key=self.api_key,
+                base_url=self.base_url,
+                temperature=temperature,
+                **kwargs,
             )
-            raise OpenRouterError(f"OpenRouter API error: {e}", e) from e
-        except Exception as e:
-            duration_ms = (time.time() - start_time) * 1000
-            log_llm_error(
-                method="chat_with_schema",
-                error=e,
-                context={"model": model_used, "schema": schema.__name__, "duration_ms": duration_ms},
-            )
-            raise OpenRouterError(f"OpenRouter request failed: {e}", e) from e
+
+            # Enable structured output
+            structured_client = client.with_structured_output(schema)
+
+            try:
+                response = await structured_client.ainvoke(converted_messages)
+                built_response = self._build_response(response)
+
+                # Calculate duration and log success
+                duration_ms = (time.time() - start_time) * 1000
+                log_llm_response(
+                    method="chat_with_schema",
+                    status="success",
+                    content_length=len(built_response.content),
+                    usage=built_response.usage,
+                    model=built_response.model,
+                    duration_ms=duration_ms,
+                    is_fallback=is_fallback,
+                )
+
+                if is_fallback:
+                    logger.warning(
+                        f"chat_with_schema succeeded with fallback model {model_to_use} "
+                        f"after {attempt_idx + 1} attempt(s)"
+                    )
+
+                return built_response
+
+            except LangChainException as e:
+                duration_ms = (time.time() - start_time) * 1000
+                last_error = e
+
+                log_llm_error(
+                    method="chat_with_schema",
+                    error=e,
+                    context={
+                        "model": model_to_use,
+                        "schema": schema.__name__,
+                        "duration_ms": duration_ms,
+                        "is_fallback": is_fallback,
+                        "attempt": attempt_idx + 1,
+                    },
+                )
+
+                if _is_retryable_error(e) and attempt_idx < len(models_to_try) - 1:
+                    logger.warning(
+                        f"chat_with_schema failed with model {model_to_use} (attempt {attempt_idx + 1}), "
+                        f"trying fallback: {models_to_try[attempt_idx + 1] if attempt_idx + 1 < len(models_to_try) else 'none'}"
+                    )
+                    continue
+                else:
+                    break
+
+            except Exception as e:
+                duration_ms = (time.time() - start_time) * 1000
+                last_error = e
+
+                log_llm_error(
+                    method="chat_with_schema",
+                    error=e,
+                    context={
+                        "model": model_to_use,
+                        "schema": schema.__name__,
+                        "duration_ms": duration_ms,
+                        "is_fallback": is_fallback,
+                    },
+                )
+
+                if _is_retryable_error(e) and attempt_idx < len(models_to_try) - 1:
+                    logger.warning(
+                        f"chat_with_schema failed with model {model_to_use}, "
+                        f"trying fallback: {models_to_try[attempt_idx + 1]}"
+                    )
+                    continue
+                else:
+                    break
+
+        # All models failed
+        raise OpenRouterError(
+            f"chat_with_schema: All models failed after {len(models_to_try)} attempts. "
+            f"Last error: {last_error}",
+            original_exception=last_error,
+            model=primary_model,
+        ) from last_error
