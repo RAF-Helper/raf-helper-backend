@@ -1,6 +1,7 @@
 """Agents package."""
 
-from .base import BaseAgent, AgentContext
+from .base import BaseAgent
+from ..state import AgentInput, AgentOutput
 from .router_agent import RouterAgent
 from .support_agent import SupportAgent
 from .events_agent import EventsAgent
@@ -22,7 +23,6 @@ from .presentation_agent import (
 
 __all__ = [
     "BaseAgent",
-    "AgentContext",
     "RouterAgent",
     "SupportAgent",
     "EventsAgent",

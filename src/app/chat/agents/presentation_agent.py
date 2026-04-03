@@ -1,6 +1,8 @@
 """Presentation agent - generates presentations (subagents: planner, slider)."""
 
-from .base import BaseAgent, AgentContext
+from .base import BaseAgent
+from ...schemas.agent import AgentType
+from ..state import AgentInput, AgentOutput
 
 
 class PresentationAgent(BaseAgent):
@@ -14,38 +16,65 @@ class PresentationAgent(BaseAgent):
     4. Export to .pptx using python-pptx
     """
 
+    agent_type = AgentType.presentation
+    tools = []  # TODO: Add tools for content formatting if needed
+
     def __init__(self, llm_client):
         super().__init__(llm_client)
         self.planner = SlidePlannerAgent(llm_client)
         self.slider = SliderAgent(llm_client)
         self.summarizer = SlideSummarizerAgent(llm_client)
 
-    async def process(self, context: AgentContext, query: str) -> str:
+    async def run(self, inp: AgentInput) -> AgentOutput:
         """Generate PowerPoint presentation."""
-        raise NotImplementedError("Implement PresentationAgent.process()")
-        # TODO:
-        # 1. Planner: create slide outline
-        # 2. For each slide: Slider creates slide using previous summaries
-        # 3. Summarize slide after creation
-        # 4. Generate .pptx file with python-pptx
+        # TODO: Implement full presentation generation pipeline
+        # For now, return placeholder
+
+        response = await self._call_llm(
+            system_prompt="You are a presentation assistant.",
+            user_prompt=inp.masked_message,
+            context="Presentation generation not yet fully implemented.",
+            temperature=0.7,
+        )
+
+        return AgentOutput(
+            content=response,
+            agent_used=self.agent_type,
+            masked_query=inp.masked_message,
+        )
 
 
 class SlidePlannerAgent(BaseAgent):
     """Plans slide structure."""
 
-    async def process(self, context: AgentContext, query: str) -> str:
-        raise NotImplementedError("Implement SlidePlannerAgent.process()")
+    agent_type = AgentType.presentation
+
+    def __init__(self, llm_client):
+        super().__init__(llm_client)
+
+    async def run(self, inp: AgentInput) -> AgentOutput:
+        raise NotImplementedError("Implement SlidePlannerAgent.run()")
 
 
 class SliderAgent(BaseAgent):
     """Creates individual slides."""
 
-    async def process(self, context: AgentContext, query: str) -> str:
-        raise NotImplementedError("Implement SliderAgent.process()")
+    agent_type = AgentType.presentation
+
+    def __init__(self, llm_client):
+        super().__init__(llm_client)
+
+    async def run(self, inp: AgentInput) -> AgentOutput:
+        raise NotImplementedError("Implement SliderAgent.run()")
 
 
 class SlideSummarizerAgent(BaseAgent):
     """Summarizes previous slides for context."""
 
-    async def process(self, context: AgentContext, query: str) -> str:
-        raise NotImplementedError("Implement SlideSummarizerAgent.process()")
+    agent_type = AgentType.presentation
+
+    def __init__(self, llm_client):
+        super().__init__(llm_client)
+
+    async def run(self, inp: AgentInput) -> AgentOutput:
+        raise NotImplementedError("Implement SlideSummarizerAgent.run()")
