@@ -18,6 +18,7 @@ from .api.routers.files import router as files_router
 from .api.routers.chats import router as chats_router
 from .api.routers.admin.staff import router as admin_staff_router
 from .api.routers.admin.events import router as admin_events_router
+from .api.routers.admin.elastic import router as admin_elastic_router
 import logging
 
 @asynccontextmanager
@@ -62,3 +63,4 @@ app.include_router(files_router)
 app.include_router(chats_router)
 app.include_router(admin_staff_router)
 app.include_router(admin_events_router)
+app.include_router(admin_elastic_router)

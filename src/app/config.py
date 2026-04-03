@@ -23,6 +23,10 @@ class Settings(BaseSettings):
         default="http://localhost:9200",
         alias="ELASTICSEARCH_URL",
     )
+    elasticsearch_update_password: str = Field(
+        default="",
+        alias="ELASTICSEARCH_UPDATE_PASSWORD",
+    )
 
     # Firebase
     firebase_credentials_path: str = Field(
