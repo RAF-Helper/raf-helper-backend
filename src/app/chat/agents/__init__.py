@@ -1,14 +1,40 @@
-"""Agent implementations."""
+"""Agents package."""
 
-from .support import SupportAgent
-from .events import EventsAgent
-from .staff import StaffAgent
-from .qa import QAAgent
-from .summarizer import SummarizerAgent
-from .abstract import AbstractAgent
-from .presentation import PresentationAgent
+from .base import BaseAgent, AgentContext
+from .router_agent import RouterAgent
+from .support_agent import SupportAgent
+from .events_agent import EventsAgent
+from .staff_agent import StaffAgent
+from .qa_agent import QAAgent
+from .summarizer_agent import SummarizerAgent
+from .abstract_agent import (
+    AbstractAgent,
+    PlannerAgent,
+    ChapterWriterAgent,
+    ChapterSummarizerAgent,
+)
+from .presentation_agent import (
+    PresentationAgent,
+    SlidePlannerAgent,
+    SliderAgent,
+    SlideSummarizerAgent,
+)
 
 __all__ = [
-    "SupportAgent", "EventsAgent", "StaffAgent", "QAAgent",
-    "SummarizerAgent", "AbstractAgent", "PresentationAgent",
+    "BaseAgent",
+    "AgentContext",
+    "RouterAgent",
+    "SupportAgent",
+    "EventsAgent",
+    "StaffAgent",
+    "QAAgent",
+    "SummarizerAgent",
+    "AbstractAgent",
+    "PlannerAgent",
+    "ChapterWriterAgent",
+    "ChapterSummarizerAgent",
+    "PresentationAgent",
+    "SlidePlannerAgent",
+    "SliderAgent",
+    "SlideSummarizerAgent",
 ]
