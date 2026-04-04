@@ -157,6 +157,40 @@ class ElasticsearchRepository:
 
         return await self.search(STAFF_INDEX, es_query, size=limit)
 
+    async def find_staff_by_entities(
+        self,
+        entities: list[dict],
+        limit: int = 5,
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Find staff records matching the given PII entities.
+
+        Args:
+            entities: List of span dicts with keys: entity_type, original
+            limit: Max staff hits per entity
+
+        Returns:
+            Mapping: {original_entity_value: [staff_hits]}
+            Empty list means no staff match.
+        """
+        # Only consider entity types that likely correspond to staff records
+        STAFF_ENTITY_TYPES = {"PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER"}
+        result: dict[str, list[dict[str, Any]]] = {}
+
+        # Deduplicate by original value to avoid redundant lookups
+        seen = set()
+        for span in entities:
+            if span["entity_type"] not in STAFF_ENTITY_TYPES:
+                continue
+            value = span["original"].strip()
+            if not value or value in seen:
+                continue
+            seen.add(value)
+
+            hits = await self.search_staff(query=value, limit=limit)
+            result[value] = hits
+
+        return result
+
     # ------------------------------------------------------------------ #
     # Events index                                                          #
     # ------------------------------------------------------------------ #

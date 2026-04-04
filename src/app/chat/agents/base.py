@@ -43,6 +43,7 @@ class BaseAgent(ABC):
         system_prompt: str | None = None,
         user_prompt: str | None = None,
         context: str | None = None,
+        history: list[dict[str, str]] | None = None,
         temperature: float = 0.7,
         model: str | None = None,
         max_tokens: int | None = None,
@@ -57,6 +58,7 @@ class BaseAgent(ABC):
             system_prompt: System message
             user_prompt: User message
             context: Additional context (added as system message)
+            history: Optional chat history to prepend as messages with "user"/"assistant" roles
             temperature: Sampling temperature
             model: Override model for this call
             max_tokens: Max tokens to generate
@@ -89,6 +91,14 @@ class BaseAgent(ABC):
         else:
             # Build messages from components
             final_messages = []
+
+            # Add history if provided
+            if history:
+                for h in history:
+                    role = h.get("role", "user")
+                    content = h.get("content", "")
+                    if content:
+                        final_messages.append(LLMMessage(role=role, content=content))
 
             # Add system prompt (with or without context)
             if system_prompt:

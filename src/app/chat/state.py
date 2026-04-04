@@ -20,6 +20,7 @@ class AgentInput:
     summarization_mode: SummarizationMode
     forced_agent: Optional[AgentType]
     extra: dict[str, Any] = field(default_factory=dict)
+    pii_spans: list[dict] = field(default_factory=list)  # PII spans from mask_text_with_spans
 
 
 @dataclass

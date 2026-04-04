@@ -51,7 +51,7 @@ class Orchestrator:
         summarization_mode: SummarizationMode,
         session: AsyncSession,
     ) -> AgentOutput:
-        masked = await self._pii.mask_text(message)
+        masked, spans = await self._pii.mask_text_with_spans(message)
 
         inp = AgentInput(
             message=message,
@@ -63,6 +63,7 @@ class Orchestrator:
             use_web_search=use_web_search,
             summarization_mode=summarization_mode,
             forced_agent=forced_agent,
+            pii_spans=spans,
         )
 
         agent_type = forced_agent if forced_agent is not None else await self._route(masked)
