@@ -26,6 +26,8 @@ dependencies = [
     "psycopg2-binary>=2.9.11",
     "asyncpg>=0.31.0",
     "aiohttp>=3.13.3",
+    "spacy>=3.8.11",
+    "ru-core-news-md",
 ]
 
 [dependency-groups]
@@ -37,3 +39,6 @@ dev = [
 
 [tool.uv]
 package = true
+
+[tool.uv.sources]
+ru-core-news-md = { url = "https://github.com/explosion/spacy-models/releases/download/ru_core_news_md-3.8.0/ru_core_news_md-3.8.0-py3-none-any.whl" }
