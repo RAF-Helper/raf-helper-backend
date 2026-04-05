@@ -32,7 +32,7 @@ STAFF_MAPPING = {
             "surname": {"type": "text", "analyzer": "russian_standard"},
             "fathers_name": {"type": "text", "analyzer": "russian_standard"},
             "position": {"type": "text", "analyzer": "russian_standard"},
-            "room": {"type": "integer"}, # TODO: mistake: room must be string for 619a and similar.
+            "room": {"type": "keyword"},
             "department": {"type": "keyword"},
             "competences": {"type": "text", "analyzer": "russian_standard"},
             "competences_vector": {
