@@ -141,3 +141,24 @@ Depending on the agent, chat history is passed up to N messages or not passed at
     - __Planner Agent__ chat history of N messages;
     - __Slider Agent__ No history, just previous slides and plan in the prompt;
     - __Slide Summarizer Agent__ No history, just previous slides and plan in the prompt;
+
+
+## Admin panel
+
+Admin UI must be separately available as an understandable frontend UI for population of events and staff indexes by university staff.
+
+__UI Implementation choices__:
+- gradio/streamlit UI (for development ONLY);
+- Flutter web UI;
+- Simple JS/TS web UI (React, Vuejs, etc.).
+
+### Core functionality
+1. List the available documents with all of the fields displayed and simple search filtering by name;
+2. Add new documents into indexes with specifying all of the fields;
+3. Update existing documents;
+4. Delete specific documents.
+
+For the MVP the streamlit implementation is enough.
+The exact implementation doesn't matter that much but the core funcionality must be done.
+
+The admin panel implies readyness of the index endpoints and embedding/reembedding working properly within them.
