@@ -133,6 +133,13 @@ class OpenRouterClient(BaseLLMClient):
                 converted.append(HumanMessage(content=msg.content))
             elif msg.role == "assistant":
                 converted.append(AIMessage(content=msg.content))
+            elif msg.role == "tool":
+                # Tool response: content should be the tool result
+                # LangChain's ToolMessage expects tool_call_id, but we'll use generic
+                converted.append(ToolMessage(
+                    content=msg.content,
+                    tool_call_id=getattr(msg, "tool_call_id", "unknown"),
+                ))
             else:
                 logger.warning(f"Unknown message role: {msg.role}, skipping")
         return converted
