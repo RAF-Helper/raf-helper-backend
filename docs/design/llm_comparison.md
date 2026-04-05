@@ -116,7 +116,7 @@ Will be perfect for working with abstract and slides due to enormous context win
 
 ## Qwen3 Next 80B A3B Instruct
 
-__OR tag__: `openai/gpt-oss-20b:free`
+__OR tag__: `qwen/qwen3-next-80b-a3b-instruct:free`
 
 ### Reasoning
 

@@ -299,7 +299,11 @@ See `docs/tools.md` (to be created) for detailed tool documentation.
 
 ## Testing
 
-_TODO: describe test chat interface_
+Test UI available at `scripts/start_test_ui.sh` or via:
+
+```shell
+uv run chainlit run src/app/chat/test_ui.py --host 0.0.0.0 --port 8001
+```
 
 ## Observability
 
