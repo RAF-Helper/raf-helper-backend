@@ -118,7 +118,7 @@ class ElasticsearchRepository:
         query: str,
         department: Optional[str] = None,
         position: Optional[str] = None,
-        room: Optional[int] = None,
+        room: Optional[str] = None,
         limit: int = 10,
         query_vector: Optional[list[float]] = None,
     ) -> list[dict[str, Any]]:
@@ -134,8 +134,9 @@ class ElasticsearchRepository:
             position: Optional filter by exact position match
             room: Optional filter by room number
         """
-        must: list[dict] = [
-            {
+        must: list[dict] = []
+        if query:
+            must.append({
                 "multi_match": {
                     "query": query,
                     "fields": [
@@ -146,8 +147,7 @@ class ElasticsearchRepository:
                     "type": "best_fields",
                     "fuzziness": "AUTO",
                 }
-            }
-        ]
+            })
         filter_: list[dict] = []
         if department:
             filter_.append({"term": {"department": department}})
