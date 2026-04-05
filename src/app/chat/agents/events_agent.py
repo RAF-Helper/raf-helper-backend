@@ -2,33 +2,31 @@
 
 from .base import BaseAgent
 from ..state import AgentInput, AgentOutput
-from app.repositories.elasticsearch_repository import ElasticsearchRepository
 from ...schemas.agent import AgentType
+from ...tools.search_tools import get_events_documents_def
 
 
 class EventsAgent(BaseAgent):
     """Provides information about events (from Elasticsearch events-index)."""
 
     agent_type = AgentType.events
-    tools = []  # TODO: Add tools for event search if needed
+    tools = [get_events_documents_def]
 
     def __init__(self, llm_client):
         super().__init__(llm_client)
-        self.es_repo = ElasticsearchRepository()
 
     async def run(self, inp: AgentInput) -> AgentOutput:
-        """Answer questions about events by searching Elasticsearch events-index."""
-        # TODO: Implement actual event search
-        # 1. Search events index via self.es_repo.search_events(inp.masked_message)
-        # 2. Format events as context
-        # 3. Generate response
+        """Answer questions about events by searching Elasticsearch events-index.
 
+        Uses the `get_events_documents` tool to retrieve event information.
+        """
+        system_prompt = self._load_prompt("events_agent")  # Loads from prompts/events_agent.txt
         response = await self._call_llm(
-            system_prompt="You are an events assistant. Answer questions about university events.",
+            system_prompt=system_prompt,
             user_prompt=inp.masked_message,
-            context="No events found yet.",  # Placeholder
             history=inp.history,
             temperature=0.7,
+            use_tools=True,
         )
 
         return AgentOutput(

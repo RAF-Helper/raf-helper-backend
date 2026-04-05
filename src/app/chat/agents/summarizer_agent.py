@@ -3,6 +3,7 @@
 from .base import BaseAgent
 from ...schemas.agent import AgentType
 from ..state import AgentInput, AgentOutput
+from ...tools.search_tools import get_materials_fragments_def
 
 
 class SummarizerAgent(BaseAgent):
@@ -10,26 +11,29 @@ class SummarizerAgent(BaseAgent):
 
     agent_type = AgentType.summarizer
     prompt_name = "summarizer_agent"
+    tools = [get_materials_fragments_def]
 
     def __init__(self, llm_client):
         super().__init__(llm_client)
 
     async def run(self, inp: AgentInput) -> AgentOutput:
         """
-        Summarize materials.
+        Summarize materials using the `get_materials_fragments` tool to retrieve content.
         """
-
-        # TODO: Extract context materials from inp.file_ids or inp.history
-
-        prompt = self._format_prompt(
-            mode="default",
-            query=inp.masked_message,
-            context="No context materials available.",  # Placeholder
-        )
+        # Load the base summarizer prompt which includes {mode} and {mode_instructions} placeholders
+        template = self._load_prompt("summarizer_agent")
+        # Format with the summarization mode from the input
+        mode = inp.summarization_mode.value if hasattr(inp.summarization_mode, 'value') else str(inp.summarization_mode)
+        # Get mode instructions from the separate file
+        mode_instructions = self._load_prompt("summarizer_mode_instructions")
+        system_prompt = template.format(mode=mode, mode_instructions=mode_instructions)
 
         response = await self._call_llm(
-            system_prompt=prompt,
+            system_prompt=system_prompt,
+            user_prompt=inp.masked_message,
+            history=inp.history[-10:] if inp.history else [],
             temperature=0.7,
+            use_tools=True,
         )
 
         return AgentOutput(

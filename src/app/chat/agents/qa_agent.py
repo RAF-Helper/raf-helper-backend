@@ -2,8 +2,8 @@
 
 from .base import BaseAgent
 from ..state import AgentInput, AgentOutput
-from app.repositories.elasticsearch_repository import ElasticsearchRepository
 from ...schemas.agent import AgentType
+from ...tools.search_tools import get_materials_fragments_def
 
 
 class QAAgent(BaseAgent):
@@ -11,33 +11,24 @@ class QAAgent(BaseAgent):
 
     agent_type = AgentType.qa
     prompt_name = "qa_agent"
-    tools = []  # TODO: Add tools for document search if needed
+    tools = [get_materials_fragments_def]
 
     def __init__(self, llm_client):
         super().__init__(llm_client)
-        self.es_repo = ElasticsearchRepository()
 
     async def run(self, inp: AgentInput) -> AgentOutput:
-        """Answer questions using uploaded materials."""
-        # TODO: Implement actual RAG retrieval
-        # 1. If inp.file_ids provided, retrieve those chunks
-        # 2. Otherwise perform semantic search on context index
-        # 3. Build context with retrieved chunks
+        """Answer questions using uploaded materials.
 
-        context = "No context materials available."  # Placeholder
-        if inp.file_ids:
-            # TODO: Retrieve chunks for these file IDs
-            pass
-
-        prompt = self._format_prompt(
-            query=inp.masked_message,
-            context=context,
-            history=inp.history[-10:] if inp.history else [],
-        )
-
+        Uses the `get_materials_fragments` tool to retrieve relevant document chunks.
+        The LLM decides when to invoke the tool based on the query and chat history.
+        """
+        system_prompt = self._load_prompt("qa_agent")  # Loads from prompts/qa_agent.txt
         response = await self._call_llm(
-            system_prompt=prompt,
+            system_prompt=system_prompt,
+            user_prompt=inp.masked_message,
+            history=inp.history[-10:] if inp.history else [],
             temperature=0.7,
+            use_tools=True,
         )
 
         return AgentOutput(

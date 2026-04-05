@@ -52,6 +52,8 @@ class BaseAgent(ABC):
     ) -> str:
         """
         Unified method to call LLM with flexible input patterns.
+        Supports tool calling when use_tools=True and self.tools is defined.
+        Automatically executes tool calls in a loop until final response.
 
         Args:
             messages: Pre-built list of LLMMessage objects (highest priority)
@@ -66,7 +68,7 @@ class BaseAgent(ABC):
             **kwargs: Additional arguments to chat methods
 
         Returns:
-            Response content string
+            Final response content string after tool execution (if any)
 
         Typical patterns:
             # Simple one-shot:
@@ -119,14 +121,57 @@ class BaseAgent(ABC):
         # Select calling method based on tools
         if use_tools and self.tools:
             logger.debug(f"Calling LLM with {len(self.tools)} tools")
-            response = await self.llm_client.chat_with_tools(
-                messages=final_messages,
-                tools=self.tools,
-                temperature=temperature,
-                model=model,
-                max_tokens=max_tokens,
-                **kwargs,
-            )
+            # Import tool functions registry here to avoid circular imports
+            from ...tools import TOOL_FUNCTIONS
+
+            # Tool execution loop
+            while True:
+                response = await self.llm_client.chat_with_tools(
+                    messages=final_messages,
+                    tools=self.tools,
+                    temperature=temperature,
+                    model=model,
+                    max_tokens=max_tokens,
+                    **kwargs,
+                )
+
+                # Check for tool calls
+                tool_calls = response.metadata.get("tool_calls", []) if response.metadata else []
+
+                if not tool_calls:
+                    # No tool calls, final response received
+                    return response.content
+
+                # Execute each tool call and append result to messages
+                for tool_call in tool_calls:
+                    tool_name = tool_call.get("name")
+                    tool_args = tool_call.get("args", {})
+                    tool_id = tool_call.get("id")
+
+                    if not tool_name:
+                        logger.warning("Tool call missing name, skipping")
+                        continue
+
+                    try:
+                        func = TOOL_FUNCTIONS.get(tool_name)
+                        if not func:
+                            result = f"Error: tool '{tool_name}' not found"
+                        else:
+                            # Execute the async tool function
+                            result = await func(**tool_args)
+                        result_str = str(result)
+                    except Exception as e:
+                        logger.error(f"Error executing tool {tool_name}: {e}", exc_info=True)
+                        result_str = f"Error: {str(e)}"
+
+                    # Append tool result as a message with role "tool" and tool_call_id
+                    final_messages.append(LLMMessage(
+                        role="tool",
+                        content=result_str,
+                        tool_call_id=tool_id or "",
+                    ))
+
+                # Continue loop: LLM will process tool results and produce final answer
         else:
             response = await self.llm_client.chat(
                 messages=final_messages,
@@ -135,8 +180,7 @@ class BaseAgent(ABC):
                 max_tokens=max_tokens,
                 **kwargs,
             )
-
-        return response.content
+            return response.content
 
     def _load_prompt(self, name: str | None = None) -> str:
         """

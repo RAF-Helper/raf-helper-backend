@@ -4,13 +4,14 @@ from .base import BaseAgent
 from ..state import AgentInput, AgentOutput
 from app.repositories.elasticsearch_repository import ElasticsearchRepository
 from ...schemas.agent import AgentType
+from ...tools.search_tools import get_staff_documents_def
 
 
 class StaffAgent(BaseAgent):
     """Provides information about staff members (from Elasticsearch staff-index)."""
 
     agent_type = AgentType.staff
-    tools = []  # TODO: Add tools for staff search if needed
+    tools = [get_staff_documents_def]
 
     def __init__(self, llm_client):
         super().__init__(llm_client)
@@ -19,27 +20,21 @@ class StaffAgent(BaseAgent):
     async def run(self, inp: AgentInput) -> AgentOutput:
         """Answer questions about staff by searching Elasticsearch staff-index.
 
-        Performs selective unmasking: if PII spans include staff names, they are
-        restored from the staff database to preserve useful information in queries.
+        First, performs selective unmasking to restore staff names from the database
+        in the user query. Then uses the `get_staff_documents` tool to retrieve
+        staff information.
         """
-        # Step 1: Selective unmasking using staff database
+        # Step 1: Selective unmasking - restore staff names
         user_prompt = inp.masked_message
         if inp.pii_spans:
-            # Find staff matching detected PII PERSON entities
             entity_staff_map = await self.es_repo.find_staff_by_entities(inp.pii_spans)
-
             if entity_staff_map:
-                # Build unmasked version by replacing masked tokens at correct positions.
-                # Process spans in reverse order (by start descending) so offsets remain valid.
                 unmasked_text = inp.masked_message
-                # Filter to PERSON spans that have staff matches
                 spans_to_replace = [
                     span for span in inp.pii_spans
                     if span["entity_type"] == "PERSON" and span["original"] in entity_staff_map
                 ]
-                # Sort descending by start index
                 spans_to_replace.sort(key=lambda s: s["start"], reverse=True)
-
                 for span in spans_to_replace:
                     hits = entity_staff_map[span["original"]]
                     if hits:
@@ -52,31 +47,16 @@ class StaffAgent(BaseAgent):
                         before = unmasked_text[:span["start"]]
                         after = unmasked_text[span["end"]:]
                         unmasked_text = before + canonical + after
-
                 user_prompt = unmasked_text
 
-        # Step 2: Search staff using the original user query (better matching)
-        staff_results = await self.es_repo.search_staff(query=inp.message, limit=5)
-
-        # Format staff info as context
-        if staff_results:
-            context_lines = []
-            for s in staff_results:
-                full_name = " ".join([s["surname"], s["name"], s.get("fathers_name") or ""]).strip()
-                context_lines.append(
-                    f"- {full_name}, {s['position']} ({s['department']}), каб. {s['room']}"
-                )
-            context = "Найдены сотрудники:\n" + "\n".join(context_lines)
-        else:
-            context = "Информация о сотрудниках не найдена."
-
-        # Step 3: Generate response
+        # Step 2: Use tool to search staff database
+        system_prompt = self._load_prompt("staff_agent")  # Loads from prompts/staff_agent.txt
         response = await self._call_llm(
-            system_prompt="You are a staff assistant. Answer questions about faculty staff members. Provide accurate information based on the context.",
+            system_prompt=system_prompt,
             user_prompt=user_prompt,
-            context=context,
             history=inp.history,
             temperature=0.7,
+            use_tools=True,
         )
 
         return AgentOutput(
