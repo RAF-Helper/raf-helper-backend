@@ -19,6 +19,16 @@ All of that should be in easy, readable, upgradable, modular way with best pract
 
 All of that may use LangChain or custom communication with the client, requires more thought and comparison.
 
+## Embeddings
+
+The embeddings should be fully configurable and modular for easy swap.
+
+The base class implements the init and embed methods.
+
+Config specifies the dimension for ES index.
+
+The provider class extends the base class to provide the functional for embeddings. The baseline is sentence transformers provider, where default is bge-m3 model with sentence-transformers as a library.
+
 ## ES Repository
 
 ES is used here storage of all the data RAG needs. Interaction between agents and the knowledge base will be done in form of tools, that should call the repository methods and other code necessary for retrieving and transforming the data.
@@ -28,6 +38,8 @@ The repository tools must accept the query and some additional parameters for fi
 The logic for constructing the query must stay inside the repository methods.
 
 However the logic for specifying the query parameters (e. g. event dates, staff person's room, etc.) should be in the higher level code inside tools themselves.
+
+__IMPORTANT NOTE__: Retrieval pipelines do not run with the incoming query (before passing to LLM). The llm agent decides on which query to use in which tool call all by itself and it is the only way to retrieve data via RAG for the agent.
 
 ## Tools
 
@@ -101,3 +113,31 @@ __Each of the tools follow similar pipeline:__
 4. Provide the full top-k documents OR just top-k chunks based on `return_chunks`, _TODO: decide or leave as an argument_:
 - If `return_chunks=True`, return the chunks from the retrieval process;
 - If `return_chunks=False`, return full documents from the storage by `document_id` in the chunks.
+
+
+## Agent Prompting 
+
+### Prompts
+
+Prompts are loaded on init for each agent by specifying prompt name. All of the prompts are stored under src/prompts/...
+
+Agent's prompts must be named according to the prompt name and subagents must lie under prompts/parnet_agent/subagent_prompt.txt.
+
+### History
+
+Depending on the agent, chat history is passed up to N messages or not passed at all, relying on the formating prompt or pasting the input as user message right after system prompt.
+
+- __Router Agent__ chat history of N messages;
+- __Support Agent__ chat history of N messages;
+- __Events Agent__ chat history of N messages;
+- __Staff Agent__ chat history of N messages;
+- __QA Agent__ chat history of N messages;
+- __Summarizer Agent__ chat history of N messages;
+- __Abstract Agent__:
+    - __Planner Agent__ chat history of N messages;
+    - __Chapter Writer Agent__ No history, just previous chapters and plan in the prompt;
+    - __Chapter Summarizer Agent__ No history, just previous chapters and plan in the prompt;
+- __Presentation Agent__:
+    - __Planner Agent__ chat history of N messages;
+    - __Slider Agent__ No history, just previous slides and plan in the prompt;
+    - __Slide Summarizer Agent__ No history, just previous slides and plan in the prompt;
