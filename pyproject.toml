@@ -28,6 +28,7 @@ dependencies = [
     "aiohttp>=3.13.3",
     "spacy>=3.8.11",
     "ru-core-news-md",
+    "sentence-transformers>=3.4.0",
 ]
 
 [dependency-groups]
