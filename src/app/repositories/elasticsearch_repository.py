@@ -250,8 +250,9 @@ class ElasticsearchRepository:
             query_vector: embedding of *query* for semantic re-ranking.
             bonus_amount: Minimum bonus amount filter (inclusive).
         """
-        must: list[dict] = [
-            {
+        must: list[dict] = []
+        if query:
+            must.append({
                 "multi_match": {
                     "query": query,
                     "fields": [
@@ -261,8 +262,7 @@ class ElasticsearchRepository:
                     "type": "best_fields",
                     "fuzziness": "AUTO",
                 }
-            }
-        ]
+            })
         filter_: list[dict] = []
         if date_from or date_to:
             date_range: dict = {}
