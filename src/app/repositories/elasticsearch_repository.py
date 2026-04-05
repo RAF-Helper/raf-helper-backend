@@ -164,16 +164,13 @@ class ElasticsearchRepository:
             es_query["bool"]["should"] = [
                 {
                     "knn": {
-                        "description_vector": {
-                            "vector": query_vector,
-                            "k": min(50, limit * 2),  # kNN candidates
-                            "num_candidates": min(100, limit * 4),
-                        }
+                        "field": "description_vector",
+                        "query_vector": query_vector,
+                        "k": min(50, limit * 2),  # kNN candidates
+                        "num_candidates": min(100, limit * 4),
                     }
                 }
             ]
-            # Optional: boost the kNN score
-            es_query["bool"]["should"][0]["_score"] = {"mode": "sum", "weight": 1.0}
 
         return await self.search(STAFF_INDEX, es_query, size=limit)
 
@@ -281,11 +278,10 @@ class ElasticsearchRepository:
             es_query["bool"]["should"] = [
                 {
                     "knn": {
-                        "description_vector": {
-                            "vector": query_vector,
-                            "k": min(50, limit * 2),
-                            "num_candidates": min(100, limit * 4),
-                        }
+                        "field": "description_vector",
+                        "query_vector": query_vector,
+                        "k": min(50, limit * 2),
+                        "num_candidates": min(100, limit * 4),
                     }
                 }
             ]
@@ -384,11 +380,10 @@ class ElasticsearchRepository:
             es_query["bool"]["should"] = [
                 {
                     "knn": {
-                        "chunk_vector": {
-                            "vector": query_vector,
-                            "k": min(50, limit * 2),
-                            "num_candidates": min(100, limit * 4),
-                        }
+                        "field": "chunk_vector",
+                        "query_vector": query_vector,
+                        "k": min(50, limit * 2),
+                        "num_candidates": min(100, limit * 4),
                     }
                 }
             ]
