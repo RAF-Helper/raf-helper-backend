@@ -1,7 +1,8 @@
 """Embedding service using sentence-transformers (local ML model)."""
 
+import asyncio
 import logging
-from typing import Optional, Literal
+from typing import Optional
 from functools import lru_cache
 
 from sentence_transformers import SentenceTransformer
@@ -18,11 +19,21 @@ SUPPORTED_MODELS = {
 DEFAULT_MODEL = "bge-m3"
 
 
+# Global singleton instance (lazy-loaded)
+@lru_cache()
+def get_embedding_service() -> "EmbeddingService":
+    """Get or create the global embedding service instance."""
+    return EmbeddingService()
+
+
 class EmbeddingService:
     """Generates embeddings for text using sentence-transformers.
 
     This is a local embedding service - models are loaded into memory and run on CPU.
     No external API calls are made.
+
+    Note: sentence-transformers is synchronous and CPU-bound. We run it in a
+    thread pool to avoid blocking the event loop in async contexts.
     """
 
     def __init__(self, model_name: str = DEFAULT_MODEL):
@@ -64,9 +75,11 @@ class EmbeddingService:
             raise ValueError("Cannot embed empty text")
 
         try:
-            # sentence-transformers is synchronous; run in thread pool would be ideal,
-            # but for simplicity we call directly (it's CPU-bound)
-            embedding = self.model.encode(text, convert_to_numpy=False)
+            # Run synchronous encode in thread pool to avoid blocking event loop
+            loop = asyncio.get_running_loop()
+            embedding = await loop.run_in_executor(
+                None, lambda: self.model.encode(text, convert_to_numpy=False)
+            )
             # Convert from numpy to list if needed
             if hasattr(embedding, "tolist"):
                 embedding = embedding.tolist()
@@ -95,7 +108,11 @@ class EmbeddingService:
             return []
 
         try:
-            embeddings = self.model.encode(valid_texts, convert_to_numpy=False)
+            # Run batch encoding in thread pool
+            loop = asyncio.get_running_loop()
+            embeddings = await loop.run_in_executor(
+                None, lambda: self.model.encode(valid_texts, convert_to_numpy=False)
+            )
             # Convert from numpy arrays to lists
             results = []
             for emb in embeddings:
@@ -103,7 +120,7 @@ class EmbeddingService:
                     results.append(emb.tolist())
                 else:
                     results.append(list(emb))
-            logger.debug(f"Generated {len(results)} embeddings")
+            logger.debug(f"Generated {len(results)} embeddings (batch)")
             return results
         except Exception as e:
             logger.error(f"Failed to generate batch embeddings: {e}")
