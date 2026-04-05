@@ -1,5 +1,6 @@
 """Admin endpoints for managing the Events Elasticsearch index."""
 
+import asyncio
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -8,6 +9,7 @@ from elasticsearch import AsyncElasticsearch
 from ....elastic.client import get_elasticsearch_client
 from ....repositories.elasticsearch_repository import ElasticsearchRepository
 from ....schemas.events import EventCreate, EventRead, EventUpdate, EventSearchResult
+from ....services.embedding_service import EmbeddingService, get_embedding_service
 
 router = APIRouter(prefix="/admin/events", tags=["admin", "events"])
 
@@ -16,37 +18,52 @@ def _get_repo(es: AsyncElasticsearch = Depends(get_elasticsearch_client)) -> Ela
     return ElasticsearchRepository(es)
 
 
+def _get_embedder():
+    return get_embedding_service()
+
+
 @router.post("/", response_model=EventRead, status_code=status.HTTP_201_CREATED)
 async def create_event(
     body: EventCreate,
     repo: ElasticsearchRepository = Depends(_get_repo),
+    embedder: EmbeddingService = Depends(_get_embedder),
 ) -> EventRead:
     """Add a new event to the index.
 
-    Vector fields (description_vector, participant_requirements_vector) are
-    populated by the embedding pipeline once the LLM integration is complete.
+    Generates embeddings for description and participant_requirements fields
+    using the sentence-transformers service. If these fields are empty, vector
+    fields are omitted (they can be added later via re-embedding).
     """
     doc = body.model_dump()
     # Serialize datetime objects for ES
     doc["date_from"] = body.date_from.isoformat()
     doc["date_to"] = body.date_to.isoformat()
-    # TODO:
-    #   doc["description_vector"] = await embed(body.description)
-    #   doc["participant_requirements_vector"] = await embed(body.participant_requirements)
+
+    # Generate embeddings if text is non-empty
+    if body.description:
+        doc["description_vector"] = await embedder.embed_text(body.description)
+    if body.participant_requirements:
+        doc["participant_requirements_vector"] = await embedder.embed_text(body.participant_requirements)
+
     doc_id = await repo.index_event(doc)
     return EventRead(id=doc_id, **body.model_dump())
 
 
 @router.get("/search", response_model=list[EventSearchResult])
 async def search_events(
-    q: str = Query(..., min_length=1),
+    q: Optional[str] = Query(None),
     date_from: Optional[datetime] = Query(default=None),
     date_to: Optional[datetime] = Query(default=None),
-    limit: int = Query(default=10, ge=1, le=50),
+    bonus_amount: Optional[int] = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
     repo: ElasticsearchRepository = Depends(_get_repo),
 ) -> list[EventSearchResult]:
-    """Full-text (BM25) events search with optional date filter."""
-    hits = await repo.search_events(q, date_from=date_from, date_to=date_to, limit=limit)
+    """Full-text (BM25 + optional kNN) events search with optional date/bonus filters.
+
+    If q is provided, performs hybrid search. If q is None/empty, returns all
+    events matching the filters with pagination.
+    """
+    hits = await repo.search_events(q or "", date_from=date_from, date_to=date_to, bonus_amount=bonus_amount, limit=limit)
     return [EventSearchResult(**h) for h in hits]
 
 
@@ -66,6 +83,7 @@ async def update_event(
     doc_id: str,
     body: EventUpdate,
     repo: ElasticsearchRepository = Depends(_get_repo),
+    embedder: EmbeddingService = Depends(_get_embedder),
 ) -> EventRead:
     partial = body.model_dump(exclude_none=True)
     if not partial:
@@ -76,7 +94,12 @@ async def update_event(
         if key in partial and isinstance(partial[key], datetime):
             partial[key] = partial[key].isoformat()
 
-    # TODO: re-embed changed text fields.
+    # If text fields are being updated, regenerate their embeddings
+    if "description" in partial and body.description:
+        partial["description_vector"] = await embedder.embed_text(body.description)
+    if "participant_requirements" in partial and body.participant_requirements:
+        partial["participant_requirements_vector"] = await embedder.embed_text(body.participant_requirements)
+
     updated = await repo.update_event(doc_id, partial)
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found.")
