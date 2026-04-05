@@ -213,4 +213,4 @@ Edit the `@cl.set_starters` function to provide your own starter messages.
 - [Agents Documentation](agents.md) — Detailed agent architecture
 - [Tools Documentation](tools.md) — Tool definitions and usage
 - [LLM Client Documentation](llm_client.md) — OpenRouter client API
-- [Requirements](requirements.md) — System requirements and design
+- [Requirements](../design/requirements.md) — System requirements and design
