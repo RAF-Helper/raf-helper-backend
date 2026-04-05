@@ -4,7 +4,7 @@ import logging
 
 from elasticsearch import AsyncElasticsearch
 
-VECTOR_DIMS = 1536  # OpenAI-compatible embedding dimension (configurable)
+VECTOR_DIMS = 1024  # BGE-M3 embedding dimension (sentence-transformers)
 
 STAFF_INDEX = "staff"
 EVENTS_INDEX = "events"
