@@ -5,6 +5,7 @@ from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
+from uuid import uuid4
 
 from .models import Base
 from ..config import settings
@@ -14,6 +15,9 @@ engine = create_async_engine(
     settings.postgres_url,
     echo=settings.debug,
     poolclass=NullPool if settings.debug else None,
+    connect_args={
+        "prepared_statement_name_func": lambda: f"__asyncpg_{uuid4()}__",
+    },
 )
 
 # Async session factory
