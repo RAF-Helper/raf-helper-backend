@@ -4,7 +4,7 @@ import logging
 
 from elasticsearch import AsyncElasticsearch
 
-VECTOR_DIMS = 1536  # OpenAI-compatible embedding dimension (configurable)
+VECTOR_DIMS = 1024  # BGE-M3 embedding dimension (sentence-transformers)
 
 STAFF_INDEX = "staff"
 EVENTS_INDEX = "events"
@@ -32,7 +32,7 @@ STAFF_MAPPING = {
             "surname": {"type": "text", "analyzer": "russian_standard"},
             "fathers_name": {"type": "text", "analyzer": "russian_standard"},
             "position": {"type": "text", "analyzer": "russian_standard"},
-            "room": {"type": "integer"},
+            "room": {"type": "keyword"},
             "department": {"type": "keyword"},
             "competences": {"type": "text", "analyzer": "russian_standard"},
             "competences_vector": {

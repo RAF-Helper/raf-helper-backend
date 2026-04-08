@@ -5,12 +5,7 @@ Summarization mode: {mode}
 Your task:
 {mode_instructions}
 
-Materials to summarize:
-{context}
+Use the `get_materials_fragments` tool to retrieve relevant content before summarizing.
+Base your summary solely on the retrieved materials.
 
-Chat history:
-{history}
-
-Request: {query}
-
-Provide your summary:
+Provide a clear, accurate summary.

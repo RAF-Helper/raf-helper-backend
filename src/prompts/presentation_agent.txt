@@ -9,7 +9,7 @@ Requirements:
 - Total: 8-12 slides depending on topic complexity
 
 Topic: {query}
-Context materials:
-{context}
+
+Use the `get_materials_fragments` tool to retrieve relevant content from uploaded materials before creating the presentation.
 
 Generate a presentation plan and sample content for each slide:

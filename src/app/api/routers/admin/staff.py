@@ -1,5 +1,6 @@
 """Admin endpoints for managing the Staff Elasticsearch index."""
 
+import asyncio
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from elasticsearch import AsyncElasticsearch
@@ -7,6 +8,7 @@ from elasticsearch import AsyncElasticsearch
 from ....elastic.client import get_elasticsearch_client
 from ....repositories.elasticsearch_repository import ElasticsearchRepository
 from ....schemas.staff import StaffCreate, StaffRead, StaffUpdate, StaffSearchResult
+from ....services.embedding_service import EmbeddingService, get_embedding_service
 
 router = APIRouter(prefix="/admin/staff", tags=["admin", "staff"])
 
@@ -20,35 +22,49 @@ def _get_repo(es: AsyncElasticsearch = Depends(get_elasticsearch_client)) -> Ela
     return ElasticsearchRepository(es)
 
 
+def _get_embedder():
+    return get_embedding_service()
+
+
 @router.post("/", response_model=StaffRead, status_code=status.HTTP_201_CREATED)
 async def create_staff(
     body: StaffCreate,
     repo: ElasticsearchRepository = Depends(_get_repo),
+    embedder: EmbeddingService = Depends(_get_embedder),
 ) -> StaffRead:
     """Add a new staff member to the index.
 
-    Vector fields (competences_vector, description_vector) are intentionally
-    omitted here — populate them via the embedding pipeline once the LLM
-    integration is complete.
+    Generates embeddings for competences and description fields using the
+    sentence-transformers service. If these fields are empty, vector fields
+    are omitted (they can be added later via re-embedding).
     """
     doc = body.model_dump()
-    # TODO: generate vectors before indexing:
-    #   doc["competences_vector"] = await embed(body.competences)
-    #   doc["description_vector"] = await embed(body.description)
+
+    # Generate embeddings if text is non-empty
+    if body.competences:
+        doc["competences_vector"] = await embedder.embed_text(body.competences)
+    if body.description:
+        doc["description_vector"] = await embedder.embed_text(body.description)
+
     doc_id = await repo.index_staff(doc)
     return StaffRead(id=doc_id, **body.model_dump())
 
 
 @router.get("/search", response_model=list[StaffSearchResult])
 async def search_staff(
-    q: str = Query(..., min_length=1),
+    q: Optional[str] = Query(None),
     department: Optional[str] = Query(default=None),
-    limit: int = Query(default=10, ge=1, le=50),
+    position: Optional[str] = Query(default=None),
+    room: Optional[str] = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
     repo: ElasticsearchRepository = Depends(_get_repo),
 ) -> list[StaffSearchResult]:
-    """Full-text (BM25) staff search. Semantic re-ranking available once
-    embedding service is wired in."""
-    hits = await repo.search_staff(q, department=department, limit=limit)
+    """Full-text (BM25 + optional kNN) staff search.
+
+    If q is provided, performs hybrid search. If q is None/empty, returns all
+    staff matching the filters (department, position, room) with pagination.
+    """
+    hits = await repo.search_staff(q or "", department=department, position=position, room=room, limit=limit)
     return [StaffSearchResult(**h) for h in hits]
 
 
@@ -68,12 +84,18 @@ async def update_staff(
     doc_id: str,
     body: StaffUpdate,
     repo: ElasticsearchRepository = Depends(_get_repo),
+    embedder: EmbeddingService = Depends(_get_embedder),
 ) -> StaffRead:
     partial = body.model_dump(exclude_none=True)
     if not partial:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No fields to update.")
 
-    # TODO: re-embed changed text fields before updating.
+    # If text fields are being updated, regenerate their embeddings
+    if "competences" in partial and body.competences:
+        partial["competences_vector"] = await embedder.embed_text(body.competences)
+    if "description" in partial and body.description:
+        partial["description_vector"] = await embedder.embed_text(body.description)
+
     updated = await repo.update_staff(doc_id, partial)
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Staff member not found.")

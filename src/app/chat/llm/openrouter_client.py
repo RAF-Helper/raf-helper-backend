@@ -85,17 +85,18 @@ class OpenRouterClient(BaseLLMClient):
     - Easy model switching
     """
 
-    def __init__(self, fallback_models: list[str] | None = None):
+    def __init__(self, fallback_models: list[str] | None = None, model: str | None = None):
         """
         Initialize the OpenRouter client.
 
         Args:
             fallback_models: Optional list of fallback model names to try if primary fails.
                            Example: ["anthropic/claude-3.5-sonnet", "openai/gpt-4-turbo"]
+            model: Optional model name to use. Overrides settings.openrouter_model if provided.
         """
         self.api_key = settings.openrouter_api_key
         self.base_url = settings.openrouter_base_url
-        self.default_model = settings.openrouter_model
+        self.default_model = model or settings.openrouter_model
         self.fallback_models = fallback_models or []
 
         # Initialize the LangChain client
@@ -132,6 +133,13 @@ class OpenRouterClient(BaseLLMClient):
                 converted.append(HumanMessage(content=msg.content))
             elif msg.role == "assistant":
                 converted.append(AIMessage(content=msg.content))
+            elif msg.role == "tool":
+                # Tool response: content should be the tool result
+                # LangChain's ToolMessage expects tool_call_id, but we'll use generic
+                converted.append(ToolMessage(
+                    content=msg.content,
+                    tool_call_id=getattr(msg, "tool_call_id", "unknown"),
+                ))
             else:
                 logger.warning(f"Unknown message role: {msg.role}, skipping")
         return converted

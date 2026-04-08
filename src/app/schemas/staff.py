@@ -9,7 +9,7 @@ class StaffCreate(BaseModel):
     surname: str
     fathers_name: Optional[str] = None
     position: str
-    room: int
+    room: str  # Can be "619a", "A-101", etc.
     department: str
     competences: str = Field(description="Free-text list of competences.")
     description: str = Field(description="Short biography / role description.")
@@ -20,7 +20,7 @@ class StaffUpdate(BaseModel):
     surname: Optional[str] = None
     fathers_name: Optional[str] = None
     position: Optional[str] = None
-    room: Optional[int] = None
+    room: Optional[str] = None
     department: Optional[str] = None
     competences: Optional[str] = None
     description: Optional[str] = None
@@ -37,7 +37,7 @@ class StaffSearchResult(BaseModel):
     surname: str
     fathers_name: Optional[str] = None
     position: str
-    room: int
+    room: str
     department: str
     competences: str
     description: str
