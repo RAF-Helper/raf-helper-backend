@@ -1,29 +1,31 @@
-"""LangGraph graph builder for agent workflows."""
+"""LangGraph state machine builder — stub."""
 
 from typing import Any
-from langgraph.graph import StateGraph, END
 from dataclasses import dataclass, field
+
+from ..schemas.agent import AgentType
+from .state import AgentInput, AgentOutput
 
 
 @dataclass
-class AgentState:
-    """State for LangGraph agents."""
+class GraphState:
+    """State flowing through the LangGraph pipeline."""
 
-    messages: list[dict[str, str]] = field(default_factory=list)
-    context: dict[str, Any] = field(default_factory=dict)
-    next: str | None = None
+    input: AgentInput | None = None
+    output: AgentOutput | None = None
+    next_node: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
-def build_agent_graph() -> StateGraph:
+def build_agent_graph():
+    """Build the LangGraph state machine.
+
+    TODO: implement nodes and edges:
+      1. pii_masker_node
+      2. router_node
+      3. support_node / events_node / staff_node / qa_node
+      4. summarizer_node / abstract_node / presentation_node
     """
-    Build the LangGraph state machine for agent orchestration.
-
-    Returns:
-        Compiled StateGraph ready for execution
-    """
-    raise NotImplementedError("Implement LangGraph builder")
-    # TODO:
-    # 1. Define state schema
-    # 2. Add nodes (router, support, events, staff, qa, summarizer, etc.)
-    # 3. Add conditional edges for routing
-    # 4. Compile and return graph
+    raise NotImplementedError(
+        "LangGraph builder not yet implemented. Use Orchestrator directly."
+    )

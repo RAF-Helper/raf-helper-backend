@@ -61,9 +61,9 @@ class ChatMessageRepository(BaseRepository[ChatMessage]):
         )
         return result.scalars().all()
 
-    async def create_message(self, chat_id: int, message_type: str, content: str) -> ChatMessage:
+    async def create_message(self, chat_id: int, role: str, content: str) -> ChatMessage:
         """Create a new chat message."""
-        return await self.create(chat_id=chat_id, message_type=message_type, content=content)
+        return await self.create(chat_id=chat_id, role=role, content=content)
 
 
 class FileMetadataRepository(BaseRepository[FileMetadata]):

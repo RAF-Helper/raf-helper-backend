@@ -14,8 +14,10 @@ COPY src/ ./src/
 
 # Install uv and dependencies
 RUN pip install uv
-RUN uv sync --all-extras --dev
+RUN uv sync
 
-EXPOSE 10000
+RUN mkdir -p /app/storage
 
-CMD ["uv", "run", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "10000"]
+EXPOSE 8000
+
+CMD ["uv", "run", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
