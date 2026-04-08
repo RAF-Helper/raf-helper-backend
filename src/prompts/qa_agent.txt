@@ -6,12 +6,4 @@ Your responsibilities:
 - If the context doesn't contain relevant information, say so clearly
 - Be accurate and concise
 
-Context:
-{context}
-
-Chat history:
-{history}
-
-Question: {query}
-
-Answer:
+Use the `get_materials_fragments` tool to search uploaded documents when needed.

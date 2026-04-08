@@ -117,21 +117,26 @@ class ElasticsearchRepository:
         self,
         query: str,
         department: Optional[str] = None,
+        position: Optional[str] = None,
+        room: Optional[str] = None,
         limit: int = 10,
         query_vector: Optional[list[float]] = None,
     ) -> list[dict[str, Any]]:
         """Hybrid staff search.
 
         Text search is always performed (BM25 over name, surname, position,
-        department, competences, description).  If *query_vector* is provided
-        the results are re-ranked using kNN on description_vector.
+        department, competences, description).  If *query_vector* is provided,
+        results are re-ranked using kNN on description_vector.
 
         Args:
             query_vector: embedding of *query* — obtain from the embedding
-                          service (LLM stub) before calling this method.
+                          service before calling this method.
+            position: Optional filter by exact position match
+            room: Optional filter by room number
         """
-        must: list[dict] = [
-            {
+        must: list[dict] = []
+        if query:
+            must.append({
                 "multi_match": {
                     "query": query,
                     "fields": [
@@ -142,20 +147,66 @@ class ElasticsearchRepository:
                     "type": "best_fields",
                     "fuzziness": "AUTO",
                 }
-            }
-        ]
+            })
         filter_: list[dict] = []
         if department:
             filter_.append({"term": {"department": department}})
+        if position:
+            filter_.append({"term": {"position": position}})
+        if room is not None:
+            filter_.append({"term": {"room": room}})
 
+        # Build hybrid query: bool with optional knn in should clause
         es_query: dict[str, Any] = {"bool": {"must": must, "filter": filter_}}
 
         if query_vector:
-            # TODO: replace with knn-aware hybrid query when LLM embedding
-            #       service is integrated (see agents/tools/embeddings.py).
-            pass
+            # Add kNN as a boosting clause
+            es_query["bool"]["should"] = [
+                {
+                    "knn": {
+                        "field": "description_vector",
+                        "query_vector": query_vector,
+                        "k": min(50, limit * 2),  # kNN candidates
+                        "num_candidates": min(100, limit * 4),
+                    }
+                }
+            ]
 
         return await self.search(STAFF_INDEX, es_query, size=limit)
+
+    async def find_staff_by_entities(
+        self,
+        entities: list[dict],
+        limit: int = 5,
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Find staff records matching the given PII entities.
+
+        Args:
+            entities: List of span dicts with keys: entity_type, original
+            limit: Max staff hits per entity
+
+        Returns:
+            Mapping: {original_entity_value: [staff_hits]}
+            Empty list means no staff match.
+        """
+        # Only consider entity types that likely correspond to staff records
+        STAFF_ENTITY_TYPES = {"PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER"}
+        result: dict[str, list[dict[str, Any]]] = {}
+
+        # Deduplicate by original value to avoid redundant lookups
+        seen = set()
+        for span in entities:
+            if span["entity_type"] not in STAFF_ENTITY_TYPES:
+                continue
+            value = span["original"].strip()
+            if not value or value in seen:
+                continue
+            seen.add(value)
+
+            hits = await self.search_staff(query=value, limit=limit)
+            result[value] = hits
+
+        return result
 
     # ------------------------------------------------------------------ #
     # Events index                                                          #
@@ -186,16 +237,19 @@ class ElasticsearchRepository:
         query: str,
         date_from: Optional[datetime] = None,
         date_to: Optional[datetime] = None,
+        bonus_amount: Optional[int] = None,
         limit: int = 10,
         query_vector: Optional[list[float]] = None,
     ) -> list[dict[str, Any]]:
-        """Hybrid events search with optional date range filter.
+        """Hybrid events search with optional date range and bonus filters.
 
         Args:
-            query_vector: embedding of *query* (LLM stub).
+            query_vector: embedding of *query* for semantic re-ranking.
+            bonus_amount: Minimum bonus amount filter (inclusive).
         """
-        must: list[dict] = [
-            {
+        must: list[dict] = []
+        if query:
+            must.append({
                 "multi_match": {
                     "query": query,
                     "fields": [
@@ -205,8 +259,7 @@ class ElasticsearchRepository:
                     "type": "best_fields",
                     "fuzziness": "AUTO",
                 }
-            }
-        ]
+            })
         filter_: list[dict] = []
         if date_from or date_to:
             date_range: dict = {}
@@ -215,12 +268,23 @@ class ElasticsearchRepository:
             if date_to:
                 date_range["lte"] = date_to.isoformat()
             filter_.append({"range": {"date_from": date_range}})
+        if bonus_amount is not None:
+            filter_.append({"range": {"bonus_amount": {"gte": bonus_amount}}})
 
+        # Build hybrid query: bool with optional knn
         es_query: dict[str, Any] = {"bool": {"must": must, "filter": filter_}}
 
         if query_vector:
-            # TODO: hybrid kNN re-ranking (LLM embedding stub).
-            pass
+            es_query["bool"]["should"] = [
+                {
+                    "knn": {
+                        "field": "description_vector",
+                        "query_vector": query_vector,
+                        "k": min(50, limit * 2),
+                        "num_candidates": min(100, limit * 4),
+                    }
+                }
+            ]
 
         return await self.search(EVENTS_INDEX, es_query, size=limit)
 
@@ -294,7 +358,7 @@ class ElasticsearchRepository:
 
         Args:
             document_ids: restrict search to chunks from these PG file IDs.
-            query_vector:  dense embedding of *query* for semantic search (LLM stub).
+            query_vector:  dense embedding of *query* for semantic search.
         """
         must: list[dict] = [
             {
@@ -313,7 +377,15 @@ class ElasticsearchRepository:
         es_query: dict[str, Any] = {"bool": {"must": must, "filter": filter_}}
 
         if query_vector:
-            # TODO: kNN semantic + BM25 hybrid (LLM embedding stub).
-            pass
+            es_query["bool"]["should"] = [
+                {
+                    "knn": {
+                        "field": "chunk_vector",
+                        "query_vector": query_vector,
+                        "k": min(50, limit * 2),
+                        "num_candidates": min(100, limit * 4),
+                    }
+                }
+            ]
 
         return await self.search(CONTEXT_MATERIALS_INDEX, es_query, size=limit)

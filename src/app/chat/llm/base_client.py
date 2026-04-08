@@ -19,8 +19,9 @@ class LLMResponse:
 class LLMMessage:
     """Message for LLM conversation."""
 
-    role: str  # "user", "assistant", "system"
+    role: str  # "user", "assistant", "system", "tool"
     content: str
+    tool_call_id: str | None = None  # Required when role="tool"
 
 
 class BaseLLMClient(ABC):

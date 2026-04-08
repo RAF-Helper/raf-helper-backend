@@ -17,3 +17,11 @@ storage
 
 # logs
 logs
+
+# chainlit files
+.chainlit
+
+# local stuff
+.claude
+.pytest_cache
+.idea

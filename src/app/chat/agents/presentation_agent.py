@@ -3,6 +3,7 @@
 from .base import BaseAgent
 from ...schemas.agent import AgentType
 from ..state import AgentInput, AgentOutput
+from ...tools.search_tools import get_materials_fragments_def
 
 
 class PresentationAgent(BaseAgent):
@@ -17,7 +18,7 @@ class PresentationAgent(BaseAgent):
     """
 
     agent_type = AgentType.presentation
-    tools = []  # TODO: Add tools for content formatting if needed
+    tools = [get_materials_fragments_def]  # Main tool for presentation content
 
     def __init__(self, llm_client):
         super().__init__(llm_client)
@@ -26,15 +27,16 @@ class PresentationAgent(BaseAgent):
         self.summarizer = SlideSummarizerAgent(llm_client)
 
     async def run(self, inp: AgentInput) -> AgentOutput:
-        """Generate PowerPoint presentation."""
-        # TODO: Implement full presentation generation pipeline
-        # For now, return placeholder
+        """Generate PowerPoint presentation using material retrieval tool."""
+        template = self._load_prompt("presentation_agent")
+        system_prompt = template.format(query=inp.masked_message)
 
         response = await self._call_llm(
-            system_prompt="You are a presentation assistant.",
+            system_prompt=system_prompt,
             user_prompt=inp.masked_message,
-            context="Presentation generation not yet fully implemented.",
+            history=inp.history,
             temperature=0.7,
+            use_tools=True,
         )
 
         return AgentOutput(
@@ -48,6 +50,7 @@ class SlidePlannerAgent(BaseAgent):
     """Plans slide structure."""
 
     agent_type = AgentType.presentation
+    tools = []  # Will use get_materials_fragments when fully implemented
 
     def __init__(self, llm_client):
         super().__init__(llm_client)
@@ -60,6 +63,7 @@ class SliderAgent(BaseAgent):
     """Creates individual slides."""
 
     agent_type = AgentType.presentation
+    tools = [get_materials_fragments_def]  # Will need material retrieval
 
     def __init__(self, llm_client):
         super().__init__(llm_client)
@@ -72,6 +76,7 @@ class SlideSummarizerAgent(BaseAgent):
     """Summarizes previous slides for context."""
 
     agent_type = AgentType.presentation
+    tools = []  # Summarization doesn't need retrieval
 
     def __init__(self, llm_client):
         super().__init__(llm_client)

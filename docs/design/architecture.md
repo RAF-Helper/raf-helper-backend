@@ -108,16 +108,16 @@ See `docs/postgres_schema.md`
 - surname: text
 - fathers_name [optional]: text
 - position: text
-- room: int
+- room: text
 - department: text
 - competences [vectorized]: text + dense_vector
-description [vectorized]: text + dense_vector
+- description [vectorized]: text + dense_vector
 
 ### Events Index
 - name: text
 - date_from: datetime
 - date_to: datetime
--description [vectorized]: text + dense_vector
+- description [vectorized]: text + dense_vector
 - bonus_amount: int
 - participant_amount: int
 - participant_requirements [vectorized]: text + dense_vector

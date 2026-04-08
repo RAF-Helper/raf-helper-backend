@@ -2,6 +2,7 @@
 
 import os
 import uuid
+import asyncio
 from pathlib import Path
 from typing import Optional
 
@@ -11,6 +12,7 @@ from ..config import settings
 from ..db.models import FileMetadata
 from ..repositories.postgres_repository import FileMetadataRepository, ChatContextRepository
 from ..repositories.elasticsearch_repository import ElasticsearchRepository
+from ..services.embedding_service import get_embedding_service
 from ..elastic.parsers import PDFParser, DocxParser, PptxParser
 from ..elastic.chunker import TextChunker
 
@@ -143,8 +145,10 @@ class FileService:
         if not chunks:
             return 0
 
-        # TODO: generate embeddings for each chunk here before bulk indexing.
-        #   vectors = await embedding_service.embed_batch(chunks)
-        #   await self.es_repo.bulk_index_chunks(file_id, chunks, vectors)
-        await self.es_repo.bulk_index_chunks(file_id, chunks, vectors=None)
+        # Generate embeddings for all chunks in parallel (using thread pool)
+        embedder = get_embedding_service()
+        vectors = await embedder.embed_batch(chunks)
+
+        # Index chunks with their embeddings
+        await self.es_repo.bulk_index_chunks(file_id, chunks, vectors)
         return len(chunks)
