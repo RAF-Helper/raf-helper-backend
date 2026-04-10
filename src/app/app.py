@@ -11,7 +11,7 @@ from .elastic.index_manager import ensure_indexes
 from .logging_config import setup_logging
 
 # Routers
-from .api.routers import health
+from .api.routers.health import router as health_router
 from .api.routers.auth import router as auth_router
 from .api.routers.chat import router as chat_router
 from .api.routers.files import router as files_router
@@ -25,7 +25,7 @@ import logging
 async def lifespan(app: FastAPI):
     # Startup
     setup_logging(
-        log_level=settings.debug and "DEBUG" or "INFO",
+        log_level="DEBUG",#settings.debug and "DEBUG" or "INFO",
         enable_console=settings.debug,
     )
     logging.info(f"Starting {settings.app_name} v{app.version}")
@@ -56,7 +56,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(health.router)
+app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(chat_router)
 app.include_router(files_router)

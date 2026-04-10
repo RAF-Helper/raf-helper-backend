@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.models import Chat, ChatMessage
 from ..repositories.postgres_repository import (
-    ChatRepository, ChatMessageRepository, ChatContextRepository, UserRepository
+    ChatRepository, ChatMessageRepository, ChatContextRepository
 )
 
 

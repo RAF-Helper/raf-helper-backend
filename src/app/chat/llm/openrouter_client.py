@@ -3,7 +3,7 @@
 import json
 import logging
 import time
-from typing import Any, AsyncIterator, Callable, TypeVar, Generic
+from typing import Any, AsyncIterator, TypeVar
 from pydantic import BaseModel
 from langchain_openrouter import ChatOpenRouter
 from langchain_core.exceptions import LangChainException

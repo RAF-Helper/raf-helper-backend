@@ -1,8 +1,5 @@
 """Simple recursive text chunker for RAG indexing."""
 
-from typing import Optional
-
-
 class TextChunker:
     """Splits long texts into overlapping chunks for Elasticsearch indexing.
 

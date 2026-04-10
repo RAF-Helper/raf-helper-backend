@@ -1,6 +1,5 @@
 """Admin endpoints for managing the Staff Elasticsearch index."""
 
-import asyncio
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from elasticsearch import AsyncElasticsearch

@@ -1,6 +1,5 @@
 """Elasticsearch client singleton."""
 
-from typing import Any
 from elasticsearch import AsyncElasticsearch
 
 from ..config import settings

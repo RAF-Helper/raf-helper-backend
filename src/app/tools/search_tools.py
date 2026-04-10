@@ -1,7 +1,7 @@
 """Search tools for agents using Elasticsearch with embeddings."""
 
 import logging
-from typing import Optional, Annotated
+from typing import Optional
 from datetime import datetime
 
 from ..repositories.elasticsearch_repository import ElasticsearchRepository

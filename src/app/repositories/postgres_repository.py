@@ -1,6 +1,5 @@
 """PostgreSQL repository implementations."""
 
-from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, insert, delete
 from sqlalchemy.exc import IntegrityError

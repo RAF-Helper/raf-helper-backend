@@ -1,6 +1,5 @@
 """Admin endpoints for managing the Events Elasticsearch index."""
 
-import asyncio
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status

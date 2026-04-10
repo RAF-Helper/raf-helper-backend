@@ -1,8 +1,5 @@
 """File upload, parsing, chunking and ES indexing service."""
 
-import os
-import uuid
-import asyncio
 from pathlib import Path
 from typing import Optional
 
