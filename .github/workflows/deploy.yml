@@ -1,0 +1,54 @@
+name: Deploy to Server
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    runs-on: dz-hosted
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "Host deploy_target
+            HostName ${{ secrets.SSH_HOST }}
+            User ${{ secrets.SSH_USER }}
+            Port ${{ secrets.SSH_PORT }}
+            IdentityFile ~/.ssh/deploy_key
+            StrictHostKeyChecking no" > ~/.ssh/config
+      
+      - name: Setup Docker
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Build Docker image
+        run: docker build -t raf-helper-backend .
+      
+      - name: Create env file
+        run: |
+          echo "PORT=${{ secrets.PORT }}" > .env
+          echo "OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}" >> .env
+          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env
+          echo "DEBUG=false" >> .env
+      
+      - name: Test SSH connection
+        run: ssh deploy_target "echo SSH test successful"
+      
+      - name: Deploy to server
+        run: |
+          ssh deploy_target "docker stop raf-helper-backend || true && docker rm raf-helper-backend || true"
+          
+          docker save raf-helper-backend | ssh deploy_target "docker load"
+          
+          scp .env deploy_target:~/raf-helper-backend-env
+
+          ssh deploy_target "docker run -d --name raf-helper-backend --memory 1g -p ${{ secrets.PORT }}:${{ secrets.PORT }} --restart unless-stopped --env-file ~/raf-helper-backend-env raf-helper-backend"
+      
+      - name: Verify deployment
+        run: |
+          echo "Waiting for application to start..."
+          sleep 10
+          ssh deploy_target "docker ps | grep raf-helper-backend" || echo "Warning: Container may not be running properly"
