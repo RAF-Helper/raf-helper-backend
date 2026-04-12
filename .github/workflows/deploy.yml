@@ -32,6 +32,7 @@ jobs:
           echo "PORT=${{ secrets.PORT }}" > .env
           echo "OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}" >> .env
           echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env
+          echo "ELASTICSEARCH_UPDATE_PASSWORD=${{ secrets.ELASTICSEARCH_UPDATE_PASSWORD }}" >> .env
           echo "DEBUG=false" >> .env
       
       - name: Test SSH connection
