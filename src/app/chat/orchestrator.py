@@ -7,7 +7,6 @@ Routing strategy (two-stage):
 Falls back to keyword routing while embedding/LLM are not integrated.
 """
 
-import math
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,20 +21,20 @@ from .agents.summarizer_agent import SummarizerAgent
 from .agents.abstract_agent import AbstractAgent
 from .agents.presentation_agent import PresentationAgent
 from ..pii.presidio_masker import PIIMasker
-from ..repositories.elasticsearch_repository import ElasticsearchRepository
+from .llm import OpenRouterClient
 
 
 class Orchestrator:
     def __init__(self):
-        es_repo = ElasticsearchRepository()
+        llm_client = OpenRouterClient()
         self._agents = {
-            AgentType.support: SupportAgent(),
-            AgentType.events: EventsAgent(es_repo),
-            AgentType.staff: StaffAgent(es_repo),
-            AgentType.qa: QAAgent(es_repo),
-            AgentType.summarizer: SummarizerAgent(es_repo),
-            AgentType.abstract: AbstractAgent(es_repo),
-            AgentType.presentation: PresentationAgent(es_repo),
+            AgentType.support: SupportAgent(llm_client),
+            AgentType.events: EventsAgent(llm_client),
+            AgentType.staff: StaffAgent(llm_client),
+            AgentType.qa: QAAgent(llm_client),
+            AgentType.summarizer: SummarizerAgent(llm_client),
+            AgentType.abstract: AbstractAgent(llm_client),
+            AgentType.presentation: PresentationAgent(llm_client),
         }
         self._pii = PIIMasker()
 
@@ -82,22 +81,9 @@ class Orchestrator:
         raise NotImplementedError("Routing not done yet.")
 
     async def _embed(self, text: str) -> list[float]:
-        """TODO: implement with LangChain embeddings via OpenRouter.
-
-            from langchain_openai import OpenAIEmbeddings
-            embedder = OpenAIEmbeddings(
-                model="text-embedding-3-small",
-                openai_api_key=settings.openrouter_api_key,
-                openai_api_base=settings.openrouter_base_url,
-            )
-            return await embedder.aembed_query(text)
-        """
+        """TODO: implement with LangChain embeddings via OpenRouter."""
         raise NotImplementedError("Embedding service not yet integrated.")
 
     async def _llm_route(self, query: str, candidates: list[AgentType]) -> AgentType:
-        """TODO: ask a small/fast LLM model to pick the best agent.
-
-            from langchain_openai import ChatOpenAI
-            ...
-        """
+        """TODO: ask a small/fast LLM model to pick the best agent."""
         raise NotImplementedError("LLM routing fallback not yet integrated.")
