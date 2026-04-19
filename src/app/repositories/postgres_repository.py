@@ -21,6 +21,13 @@ class UserRepository(BaseRepository[User]):
         )
         return result.scalar_one_or_none()
 
+    async def get_by_email(self, email: str) -> User | None:
+        """Get user by email address."""
+        result = await self.session.execute(
+            select(User).where(User.email == email)
+        )
+        return result.scalar_one_or_none()
+
     async def get_or_create(self, firebase_id: str) -> User:
         """Get existing user or create new one."""
         user = await self.get_by_firebase_id(firebase_id)
