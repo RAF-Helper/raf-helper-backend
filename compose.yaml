@@ -6,7 +6,7 @@ services:
       - cluster.name=es-docker-cluster
       - discovery.type=single-node
       - bootstrap.memory_lock=true
-      - ES_JAVA_OPTS=-Xms4g -Xmx4g
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
       - xpack.security.enabled=false
       - cluster.routing.allocation.disk.watermark.low=97%
       - cluster.routing.allocation.disk.watermark.high=98%
@@ -15,7 +15,7 @@ services:
       - elastic_data:/usr/share/elasticsearch/data
     ports:
       - 9200:9200
-    mem_limit: 4096m
+    mem_limit: 2048m
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
       interval: 10s

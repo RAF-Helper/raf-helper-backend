@@ -43,7 +43,7 @@ async def verify_firebase_token(
 
     try:
         # Verify the token
-        decoded_token = firebase_auth.verify_id_token(token, app=get_firebase_app())
+        decoded_token = firebase_auth.verify_id_token(token, app=get_firebase_app(), clock_skew_seconds=5)
         user_id = decoded_token["uid"]
 
         # Check email domain (@bsu.by)
