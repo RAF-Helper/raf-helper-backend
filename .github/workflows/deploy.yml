@@ -27,13 +27,16 @@ jobs:
       - name: Build Docker image
         run: docker build -t raf-helper-backend .
       
-      - name: Create env file
+      - name: Create env secrets
         run: |
           echo "PORT=${{ secrets.PORT }}" > .env
           echo "OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}" >> .env
           echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env
           echo "ELASTICSEARCH_UPDATE_PASSWORD=${{ secrets.ELASTICSEARCH_UPDATE_PASSWORD }}" >> .env
+          echo "FIREBASE_CREDENTIALS_PATH=${{ secrets.FIREBASE_CREDENTIALS_PATH }}" >> .env
           echo "DEBUG=false" >> .env
+
+          echo '${{ secrets.FIREBASE_CREDENTIALS }}' > firebase-credentials.json
       
       - name: Test SSH connection
         run: ssh deploy_target "echo SSH test successful"
@@ -45,8 +48,9 @@ jobs:
           docker save raf-helper-backend | ssh deploy_target "docker load"
           
           scp .env deploy_target:~/raf-helper-backend-env
+          scp firebase-credentials.json deploy_target:~/raf-helper-backend-firebase-creds
 
-          ssh deploy_target "docker run -d --name raf-helper-backend --cpus="1.0" --memory 1g -p ${{ secrets.PORT }}:${{ secrets.PORT }} --restart unless-stopped --env-file ~/raf-helper-backend-env raf-helper-backend"
+          ssh deploy_target "docker run -d --name raf-helper-backend --cpus="1.0" --memory 1g -p ${{ secrets.PORT }}:${{ secrets.PORT }} --restart unless-stopped --env-file ~/raf-helper-backend-env -v ~/raf-helper-backend-firebase-creds:${{ secrets.FIREBASE_CREDENTIALS_PATH }} raf-helper-backend"
       
       - name: Verify deployment
         run: |
