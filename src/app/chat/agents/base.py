@@ -48,6 +48,8 @@ class BaseAgent(ABC):
         model: str | None = None,
         max_tokens: int | None = None,
         use_tools: bool = False,
+        file_ids: list[int] | None = None,
+        use_web_search: bool = False,
         **kwargs: Any,
     ) -> str:
         """
@@ -65,6 +67,8 @@ class BaseAgent(ABC):
             model: Override model for this call
             max_tokens: Max tokens to generate
             use_tools: Whether to enable tool calling (tools from self.tools)
+            file_ids: List of document IDs from chat context (injected into tool calls)
+            use_web_search: Whether to enable web search (injected into tool calls)
             **kwargs: Additional arguments to chat methods
 
         Returns:
@@ -84,8 +88,12 @@ class BaseAgent(ABC):
             await self._call_llm(user_prompt="Question?",
                                  context="Document 1: ... Document 2: ...")
 
-            # Direct message control:
-            await self._call_llm(messages=[LLMMessage(role="user", content="Hello")])
+            # With tool context (file_ids, use_web_search):
+            await self._call_llm(system_prompt="...",
+                                 user_prompt="...",
+                                 use_tools=True,
+                                 file_ids=inp.file_ids,
+                                 use_web_search=inp.use_web_search)
         """
         if messages is not None:
             # Use provided messages directly
@@ -151,6 +159,14 @@ class BaseAgent(ABC):
                     if not tool_name:
                         logger.warning("Tool call missing name, skipping")
                         continue
+
+                    # Inject chat context into tool args for materials search
+                    if tool_name == "get_materials_fragments":
+                        # Inject document_ids from chat context if not provided
+                        if file_ids is not None and "document_ids" not in tool_args:
+                            tool_args["document_ids"] = file_ids
+                        # Inject use_web_search flag
+                        tool_args["use_web_search"] = use_web_search
 
                     try:
                         func = TOOL_FUNCTIONS.get(tool_name)
