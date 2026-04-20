@@ -114,6 +114,26 @@ __Each of the tools follow similar pipeline:__
 - If `return_chunks=True`, return the chunks from the retrieval process;
 - If `return_chunks=False`, return full documents from the storage by `document_id` in the chunks.
 
+## Tool integration
+
+Important point for material tools is to be called with high abstraction level for the agent.
+
+This means, that the agent explicitly calls only `get_materials_fragments(query, return_chunks, k)` and the rest is automatically controlled within the system.
+
+So chat settings that determine context are automatically determined in the tool call.
+
+### Basic tool requirements:
+- Material tools only require these parameters explicitly:
+  - query: text request to search for;
+  - return_chunks: whether to return chunk fragments or the whole document;
+  - k: amount of chunks to consider in the final ranging;
+- Information of the materials available is handled by the system, e. g. documents to search in or websearch usage;
+- Websearch is done separately via Tavily service that calls the api with the same queries from the tools;
+- `Staff` and `Events` tools require queries to be searched upon in all vectorized fields and explicit parameters to filter by.
+
+
+The final implementation is to be decided, but overall the agent must only think about `query`, `chunks`, `k`, while chat environment determines which documents to search in.
+
 
 ## Agent Prompting 
 
