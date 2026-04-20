@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
 # Copy project files
 COPY pyproject.toml .
 COPY src/ ./src/
+COPY alembic/ ./alembic/
 
 # Install uv and dependencies
 RUN pip install uv

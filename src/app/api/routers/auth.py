@@ -1,5 +1,7 @@
 """Auth router — syncs the Firebase user into PostgreSQL on first login."""
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,7 +34,6 @@ async def sync_user(
         fb_user = fa.get_user(firebase_uid, app=get_firebase_app())
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
-
     svc = UserService(session)
     user = await svc.get_or_create(firebase_uid, fb_user.email or "")
     return UserRead.model_validate(user)

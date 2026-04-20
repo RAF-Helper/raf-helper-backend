@@ -5,6 +5,7 @@ import os
 import sys
 from logging.config import fileConfig
 from pathlib import Path
+from uuid import uuid4
 
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
@@ -60,6 +61,9 @@ async def run_async_migrations() -> None:
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args={
+            "prepared_statement_name_func": lambda: f"__asyncpg_{uuid4()}__",
+        },
     )
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)

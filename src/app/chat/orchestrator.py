@@ -7,7 +7,6 @@ Routing strategy (two-stage):
 Falls back to keyword routing while embedding/LLM are not integrated.
 """
 
-import math
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,20 +21,21 @@ from .agents.summarizer_agent import SummarizerAgent
 from .agents.abstract_agent import AbstractAgent
 from .agents.presentation_agent import PresentationAgent
 from ..pii.presidio_masker import PIIMasker
-from ..repositories.elasticsearch_repository import ElasticsearchRepository
+from .llm import OpenRouterClient, LLMMessage
 
 
 class Orchestrator:
     def __init__(self):
-        es_repo = ElasticsearchRepository()
+        llm_client = OpenRouterClient()
+        self._llm = llm_client
         self._agents = {
-            AgentType.support: SupportAgent(),
-            AgentType.events: EventsAgent(es_repo),
-            AgentType.staff: StaffAgent(es_repo),
-            AgentType.qa: QAAgent(es_repo),
-            AgentType.summarizer: SummarizerAgent(es_repo),
-            AgentType.abstract: AbstractAgent(es_repo),
-            AgentType.presentation: PresentationAgent(es_repo),
+            AgentType.support: SupportAgent(llm_client),
+            AgentType.events: EventsAgent(llm_client),
+            AgentType.staff: StaffAgent(llm_client),
+            AgentType.qa: QAAgent(llm_client),
+            AgentType.summarizer: SummarizerAgent(llm_client),
+            AgentType.abstract: AbstractAgent(llm_client),
+            AgentType.presentation: PresentationAgent(llm_client),
         }
         self._pii = PIIMasker()
 
@@ -70,34 +70,36 @@ class Orchestrator:
         return await self._agents[agent_type].run(inp)
 
     async def _route(self, query: str) -> AgentType:
-        """TODO: implement routing pipeline with calling of the agent necessary.
-        Will include:
-        - Embedding the query;
-        - Finding the closest examples in the postgres table of route examples;
-        - Analysing results and choosing the best possible routes;
-        - Call LLM in case the routes are too close or can't be determined.
+        """Route query to the appropriate agent using LLM.
 
-        Fallback examples or route mechanics may be added in the future, but for now pipeline is fixed.
+        Sends the query to the LLM with a routing prompt describing each agent,
+        then parses the response to select the best matching AgentType.
+        Falls back to QA agent if parsing fails.
         """
-        raise NotImplementedError("Routing not done yet.")
+        return await self._llm_route(query)
 
-    async def _embed(self, text: str) -> list[float]:
-        """TODO: implement with LangChain embeddings via OpenRouter.
-
-            from langchain_openai import OpenAIEmbeddings
-            embedder = OpenAIEmbeddings(
-                model="text-embedding-3-small",
-                openai_api_key=settings.openrouter_api_key,
-                openai_api_base=settings.openrouter_base_url,
-            )
-            return await embedder.aembed_query(text)
-        """
-        raise NotImplementedError("Embedding service not yet integrated.")
-
-    async def _llm_route(self, query: str, candidates: list[AgentType]) -> AgentType:
-        """TODO: ask a small/fast LLM model to pick the best agent.
-
-            from langchain_openai import ChatOpenAI
-            ...
-        """
-        raise NotImplementedError("LLM routing fallback not yet integrated.")
+    async def _llm_route(self, query: str) -> AgentType:
+        """Ask LLM to pick the best agent for the given query."""
+        system = (
+            "You are a routing assistant. Based on the user's query, choose the single best agent.\n\n"
+            "Agents:\n"
+            "- support: off-topic questions, questions about the system itself, greetings\n"
+            "- events: university events, competitions, hackathons, bonuses, dates\n"
+            "- staff: faculty staff, professors, who teaches what, room numbers\n"
+            "- qa: questions about uploaded study materials (lectures, books, PDFs)\n"
+            "- summarizer: summarize uploaded materials\n"
+            "- abstract: write an essay/abstract based on materials\n"
+            "- presentation: create a presentation based on materials\n\n"
+            "Reply with ONLY the agent name, nothing else. "
+            "One of: support, events, staff, qa, summarizer, abstract, presentation"
+        )
+        messages = [
+            LLMMessage(role="system", content=system),
+            LLMMessage(role="user", content=query),
+        ]
+        try:
+            response = await self._llm.chat(messages=messages, temperature=0.0, max_tokens=20)
+            chosen = response.content.strip().lower().split()[0]
+            return AgentType(chosen)
+        except Exception:
+            return AgentType.qa

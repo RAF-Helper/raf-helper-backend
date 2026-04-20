@@ -1,5 +1,6 @@
 """Firebase authentication integration."""
 
+import logging
 from typing import Any
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -24,6 +25,7 @@ def get_firebase_app() -> firebase_admin.App:
             _firebase_app = firebase_admin.initialize_app(cred)
         except Exception as e:
             raise RuntimeError(f"Failed to initialize Firebase: {e}")
+    logging.info('firebase app init success')
     return _firebase_app
 
 
@@ -43,7 +45,7 @@ async def verify_firebase_token(
 
     try:
         # Verify the token
-        decoded_token = firebase_auth.verify_id_token(token, app=get_firebase_app())
+        decoded_token = firebase_auth.verify_id_token(token, app=get_firebase_app(), clock_skew_seconds=5)
         user_id = decoded_token["uid"]
 
         # Check email domain (@bsu.by)
@@ -61,7 +63,6 @@ async def verify_firebase_token(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Only @bsu.by email addresses are allowed.",
             )
-
         return user_id
 
     except FirebaseError as e:

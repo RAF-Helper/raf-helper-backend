@@ -29,6 +29,7 @@ ADMIN_TOKEN = os.getenv("ELASTICSEARCH_UPDATE_PASSWORD")
 RESTART_DELAY = 3
 REQUEST_TIMEOUT = 10
 RETRY_DELAY = 30
+PERIODIC_SEND_INTERVAL = 30 * 60  # 30 minutes in seconds
 
 URL_REGEX = re.compile(r"https://[a-zA-Z0-9\-\.]+\.lhr\.life")
 
@@ -58,6 +59,7 @@ current_url = None
 retry_thread = None
 stop_event = threading.Event()
 lock = threading.Lock()
+periodic_stop_event = threading.Event()
 
 # ==============================
 # HELPERS
@@ -135,6 +137,51 @@ def start_retry(url: str):
     )
     retry_thread.start()
 
+
+def periodic_url_sender(stop_event: threading.Event):
+    """Send current URL every 30 minutes in case server was redeployed."""
+    logger.info("Periodic URL sender started")
+
+    while not stop_event.is_set():
+        # Wait for the interval, checking stop_event periodically
+        for _ in range(PERIODIC_SEND_INTERVAL):
+            if stop_event.is_set():
+                logger.info("Periodic sender stopped")
+                return
+            time.sleep(1)
+
+        # Send current URL if we have one
+        with lock:
+            url_to_send = current_url
+
+        if url_to_send:
+            logger.info(f"Periodic send: sending URL {url_to_send}")
+            try:
+                response = requests.post(
+                    API_ENDPOINT,
+                    json={"url": url_to_send},
+                    headers={
+                        "X-Admin-Token": ADMIN_TOKEN,
+                        "Content-Type": "application/json",
+                    },
+                    timeout=REQUEST_TIMEOUT,
+                )
+
+                try:
+                    data = response.json()
+                except ValueError:
+                    data = None
+
+                if response.status_code == 200 and is_valid_response(data):
+                    logger.info(f"[PERIODIC] URL accepted: {url_to_send}")
+                else:
+                    logger.warning(f"[PERIODIC] Bad response: {response.status_code} | {data}")
+
+            except requests.RequestException as e:
+                logger.error(f"[PERIODIC] Request failed: {e}")
+        else:
+            logger.debug("No URL to send periodically")
+
 # ==============================
 # CORE LOOP
 # ==============================
@@ -188,11 +235,21 @@ def run_and_monitor():
 # ==============================
 
 if __name__ == "__main__":
+    # Start periodic sender thread
+    periodic_thread = threading.Thread(
+        target=periodic_url_sender,
+        args=(periodic_stop_event,),
+        daemon=True,
+    )
+    periodic_thread.start()
+
     try:
         run_and_monitor()
     except KeyboardInterrupt:
         logger.info("\nStopping...")
         stop_event.set()
+        periodic_stop_event.set()
         if retry_thread:
             retry_thread.join()
+        periodic_thread.join(timeout=5)
         sys.exit(0)
