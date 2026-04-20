@@ -18,7 +18,6 @@ _firebase_app: firebase_admin.App | None = None
 
 def get_firebase_app() -> firebase_admin.App:
     """Get or initialize Firebase app."""
-    logging.info('getting firebase app')
     global _firebase_app
     if _firebase_app is None:
         try:
@@ -42,7 +41,6 @@ async def verify_firebase_token(
     Raises:
         HTTPException: If token is invalid or verification fails
     """
-    logging.info('starting token verification')
     token = credentials.credentials
 
     try:
@@ -55,29 +53,24 @@ async def verify_firebase_token(
         email_verified = decoded_token.get("email_verified", False)
 
         if not email_verified:
-            logging.info('token verify error')
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Email not verified. Please verify your email before proceeding.",
             )
 
         if not email.lower().endswith("@bsu.by"):
-            logging.info('token verify error')
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Only @bsu.by email addresses are allowed.",
             )
-        logging.info('verified succefully')
         return user_id
 
     except FirebaseError as e:
-        logging.info('token verify error')
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Invalid authentication credentials: {str(e)}",
         )
     except Exception as e:
-        logging.info('token verify error')
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Authentication failed: {str(e)}",

@@ -30,16 +30,12 @@ async def sync_user(
     from ...api.auth.firebase import get_firebase_app
     import firebase_admin.auth as fa
 
-    logging.info('getting firebase app to retrieve user')
     try:
         fb_user = fa.get_user(firebase_uid, app=get_firebase_app())
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
-    logging.info('retrieve firebase user')
     svc = UserService(session)
-    logging.info('retrieving or creating user')
     user = await svc.get_or_create(firebase_uid, fb_user.email or "")
-    logging.info(f'found user with id: {user.id}')
     return UserRead.model_validate(user)
 
 
