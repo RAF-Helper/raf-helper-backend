@@ -10,7 +10,7 @@ from ..db.models import FileMetadata
 from ..repositories.postgres_repository import FileMetadataRepository, ChatContextRepository
 from ..repositories.elasticsearch_repository import ElasticsearchRepository
 from ..services.embedding_service import get_embedding_service
-from ..elastic.parsers import PDFParser, DocxParser, PptxParser
+from ..parsers import PDFParser, DocxParser, PptxParser
 from ..elastic.chunker import TextChunker
 
 _PARSERS = {
