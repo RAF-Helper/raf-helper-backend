@@ -177,7 +177,7 @@ async def get_materials_fragments(
     # If web search is enabled, also search the web
     if use_web_search:
         tavily = get_tavily_service()
-        web_results = await tavily.search(query)
+        web_results = await tavily.search(query, include_raw_content=True)
 
         if web_results:
             web_lines = ["[Web Search Results]"]
