@@ -31,6 +31,7 @@ dependencies = [
     "sentence-transformers>=3.4.0",
     "chainlit>=2.5.0",
     "streamlit>=1.40.0",
+    "tavily>=1.1.0",
 ]
 
 [dependency-groups]
