@@ -1,48 +1,67 @@
-"""Tavily web search service (mock implementation)."""
+"""Tavily web search service."""
 
 import logging
-from typing import Any
+from typing import Any, Optional
+
+from tavily import TavilyClient
+
+from ..config import settings
 
 logger = logging.getLogger(__name__)
 
 
 class TavilyService:
-    """Web search service using Tavily API.
+    """Web search service using Tavily API."""
 
-    This is a mock implementation that returns placeholder results.
-    To be replaced with real Tavily API integration later.
-    """
+    def __init__(self):
+        """Initialize Tavily client with API key from settings."""
+        api_key = settings.tavily_api_key
+        if not api_key:
+            logger.warning("TAVILY_API_KEY not configured - web search will not work")
+            self._client = None
+        else:
+            self._client = TavilyClient(api_key=api_key)
 
-    async def search(self, query: str) -> list[dict[str, Any]]:
+    async def search(self, query: str, max_results: int = 3, include_raw_content = False) -> list[dict[str, Optional[str]]]:
         """
         Search the web for the given query.
 
         Args:
             query: Search query string
+            max_results: Maximum number of results to return (default 3)
+            include_raw_content: Whether to return raw content (default False)
 
         Returns:
             List of search results, each containing title, url, and content
         """
-        logger.info(f"Mock Tavily search for: {query}")
+        if not self._client:
+            logger.warning("Tavily client not initialized - returning empty results")
+            return []
 
-        # Mock results - replace with real Tavily API call later
-        # Real implementation would use: https://api.tavily.com/search
-        mock_results = [
-            {
-                "title": f"Result for '{query}' - Example Source 1",
-                "url": "https://example.com/result1",
-                "content": f"This is a mock search result for the query '{query}'. "
-                           f"Replace this with real Tavily API integration.",
-            },
-            {
-                "title": f"Information about '{query}' - Example Source 2",
-                "url": "https://example.com/result2",
-                "content": f"Additional mock result for '{query}'. "
-                           f"The real Tavily API would return actual web content here.",
-            },
-        ]
+        logger.info(f"Tavily search for: {query}")
 
-        return mock_results
+        try:
+            response = self._client.search(
+                query=query,
+                max_results=max_results,
+                include_answer=False,
+                include_raw_content=include_raw_content,
+            )
+
+            results = []
+            for item in response.get("results", []):
+                results.append({
+                    "title": item.get("title", None),
+                    "url": item.get("url", None),
+                    "content": item.get("content", None),
+                    "raw_content": item.get("raw_content", None),
+                })
+
+            return results
+
+        except Exception as e:
+            logger.error(f"Tavily search error: {e}", exc_info=True)
+            return []
 
 
 # Global singleton instance
