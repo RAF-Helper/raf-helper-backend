@@ -5,7 +5,6 @@ services:
       - node.name=es
       - cluster.name=es-docker-cluster
       - discovery.type=single-node
-      - bootstrap.memory_lock=true
       - ES_JAVA_OPTS=-Xms4g -Xmx4g
       - xpack.security.enabled=false
       - cluster.routing.allocation.disk.watermark.low=97%
@@ -36,7 +35,7 @@ services:
       timeout: 5s
       retries: 5
     ports:
-      - "5432:5432"
+      - "5434:5432"
     env_file:
       - .env
     volumes:
@@ -52,13 +51,16 @@ services:
         DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@postgresql/${POSTGRES_DATABASE}
         ELASTICSEARCH_URL: http://elastic:9200
         STORAGE_PATH: /app/storage
+        OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+        TAVILY_API_KEY: ${TAVILY_API_KEY}
+        DEBUG: ${DEBUG}
     depends_on:
       postgresql:
         condition: service_healthy
       elastic:
         condition: service_healthy
     ports:
-      - "8000:8000"
+      - "8000:10000"
     volumes:
       - backend_storage:/app/storage
     env_file:
