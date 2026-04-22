@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     # File storage
     storage_path: str = Field(default="./storage", alias="STORAGE_PATH")
 
+    # Chunking
+    chunk_size: int = Field(default=1000, alias="CHUNK_SIZE")
+    chunk_overlap: int = Field(default=200, alias="CHUNK_OVERLAP")
+    slides_chunk_size: int = Field(default=500, alias="SLIDES_CHUNK_SIZE")
+    slides_chunk_overlap: int = Field(default=100, alias="SLIDES_CHUNK_OVERLAP")
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
