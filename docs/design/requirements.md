@@ -322,7 +322,8 @@ For proper testing and incremental implementation of the system it is advised to
 3. Implementing base and basic text parsers for initial testing of the whole system;
 4. Implement chunking service and integrate into existing parsers;
 5. Developing the document service with proper injestion and retrieval and introducing full pipeline into the agentic tools;
-6. Adjusting endpoints and routers for proper document upload and add temporary test search endpoint with full pipeline as in agentictools;
+6. Adjusting endpoints and routers for proper document upload and add temporary test search endpoint with full pipeline as in agentic tools;
 7. Implementing document upload and search UI with streamlit for testing (under src/test_ui/materials) using the backend's API and not direct calls to services;
-8. Engineer the rest of the parsers for each extension;
-9. Documenting everything and perform heavy testing on real data.
+8. Adjust search tools for agents to implement new logic for documents retrieval according to the requirements;
+9. Engineer the rest of the parsers for each extension;
+10. Documenting everything and perform heavy testing on real data.
