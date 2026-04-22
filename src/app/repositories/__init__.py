@@ -9,6 +9,7 @@ from .postgres_repository import (
     ChatContextRepository,
 )
 from .elasticsearch_repository import ElasticsearchRepository
+from .document_repository import DocumentRepository
 
 __all__ = [
     "BaseRepository",
@@ -18,4 +19,5 @@ __all__ = [
     "FileMetadataRepository",
     "ChatContextRepository",
     "ElasticsearchRepository",
+    "DocumentRepository",
 ]
