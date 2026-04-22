@@ -46,3 +46,6 @@ package = true
 
 [tool.uv.sources]
 ru-core-news-md = { url = "https://github.com/explosion/spacy-models/releases/download/ru_core_news_md-3.8.0/ru_core_news_md-3.8.0-py3-none-any.whl" }
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
