@@ -219,7 +219,8 @@ Implementation must consist of a base class `BaseParser` that defines:
 Requirements for the implementation
 - Each class is defined as `XParser(BaseParser)` and overloads the methods above using any libraries and includes any amount of additional methods needed;
 - Code lies under `src/app/documents/` with `base.py` and `x.py`, `y.py`, etc. files for each parser;
-- Additionaly, `DocumentService` exists to automatically select needed parser based on documents extension, acting as a factory pattern.
+- Additionaly, `DocumentService` exists to automatically select needed parser based on documents extension, acting as a factory pattern;
+- For chunking, `Chunker` or `ChunkingService` exists that accepts string text and returns chunks that are later contructed into `DocumentChunks` in parsers.
 
 ### Documents
 
@@ -319,8 +320,9 @@ For proper testing and incremental implementation of the system it is advised to
 1. Databases (postgresql and es) preparation, making migrations and adjusting their repositories (at `app.repositores`);
 2. Implementing document models and create the document repository with full search pipeline;
 3. Implementing base and basic text parsers for initial testing of the whole system;
-4. Developing the document service with proper injestion and retrieval and introducing full pipeline into the agentic tools;
-5. Adjusting endpoints and routers for proper document upload and add temporary test search endpoint with full pipeline as in agentictools;
-6. Implementing document upload and search UI with streamlit for testing (under src/test_ui/materials) using the backend's API and not direct calls to services;
-7. Engineer the rest of the parsers for each extension;
-8. Documenting everything and perform heavy testing on real data.
+4. Implement chunking service and integrate into existing parsers;
+5. Developing the document service with proper injestion and retrieval and introducing full pipeline into the agentic tools;
+6. Adjusting endpoints and routers for proper document upload and add temporary test search endpoint with full pipeline as in agentictools;
+7. Implementing document upload and search UI with streamlit for testing (under src/test_ui/materials) using the backend's API and not direct calls to services;
+8. Engineer the rest of the parsers for each extension;
+9. Documenting everything and perform heavy testing on real data.
