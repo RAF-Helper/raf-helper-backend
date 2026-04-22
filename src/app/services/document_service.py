@@ -1,4 +1,4 @@
-"""File upload, parsing, chunking and ES indexing service."""
+"""Document service for upload, parsing, chunking and ES indexing."""
 
 from pathlib import Path
 from typing import Optional
@@ -8,18 +8,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import settings
 from ..db.models import FileMetadata
 from ..repositories.postgres_repository import FileMetadataRepository, ChatContextRepository
+from ..repositories.document_repository import DocumentRepository
 from ..repositories.elasticsearch_repository import ElasticsearchRepository
 from ..services.embedding_service import get_embedding_service
-from ..parsers import PDFParser, DocxParser, PptxParser
-from ..elastic.chunker import TextChunker
+from ..services.chunking_service import ChunkingService
+from ..parsers import PDFParser, DocxParser, PptxParser, TextParser
 
 _PARSERS = {
     "application/pdf": PDFParser(),
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": DocxParser(),
     "application/vnd.openxmlformats-officedocument.presentationml.presentation": PptxParser(),
+    "text/plain": TextParser(),
 }
 
-_CHUNKER = TextChunker(max_size=1000, overlap=200)
+_CHUNK_SERVICE = ChunkingService()
 
 _ALLOWED_MIME_TYPES = set(_PARSERS.keys())
 
@@ -28,11 +30,12 @@ class UnsupportedFileTypeError(Exception):
     pass
 
 
-class FileService:
+class DocumentService:
     def __init__(self, session: AsyncSession, es_repo: Optional[ElasticsearchRepository] = None):
         self.session = session
         self.file_repo = FileMetadataRepository(session)
         self.ctx_repo = ChatContextRepository(session)
+        self.doc_repo = DocumentRepository()
         self.es_repo = es_repo or ElasticsearchRepository()
 
     # ------------------------------------------------------------------ #
@@ -79,7 +82,7 @@ class FileService:
         # 3. Update path in DB.
         file_record = await self.file_repo.update(file_record.id, path=str(dest))
 
-        # 4. Parse + chunk + index (synchronously for now; move to bg task if slow).
+        # 4. Parse + chunk + index
         chunk_count = await self._index_file(file_record.id, str(file_record.document_id), mime_type, data, original_name)
 
         file_record = await self.file_repo.update(
@@ -118,12 +121,27 @@ class FileService:
             return False
         return await self.ctx_repo.link_file_to_chat(chat_id, file_id)
 
-    async def unlink_from_chat(self, file_id: int, chat_id: int) -> bool:
+    async def unlink_from_chat(self, file_id: int, chat_id: int, user_id: int) -> bool:
         return await self.ctx_repo.unlink_file_from_chat(chat_id, file_id)
 
     async def get_chat_file_ids(self, chat_id: int) -> list[int]:
         files = await self.ctx_repo.get_files_for_chat(chat_id)
         return [f.id for f in files]
+
+    async def search_materials(
+        self,
+        query: str,
+        document_ids: list[str],
+        k: int = 5,
+        return_chunks: bool = False,
+    ) -> list[dict]:
+        """Search materials via the DocumentRepository pipeline."""
+        return await self.doc_repo.search(
+            query=query,
+            document_ids=document_ids,
+            k=k,
+            return_chunks=return_chunks
+        )
 
     # ------------------------------------------------------------------ #
     # Internal                                                              #
@@ -132,20 +150,22 @@ class FileService:
     async def _index_file(
         self, file_id: int, document_id: str, mime_type: str, data: bytes, filename: str
     ) -> int:
-        parser = _PARSERS[mime_type]
-        parsed = parser.parse_bytes(data, filename)
-        text: str = parsed.get("text", "")
-        if not text.strip():
-            return 0
+        parser = _PARSERS.get(mime_type, _PARSERS["text/plain"])
 
-        chunks = _CHUNKER.split(text)
-        if not chunks:
-            return 0
+        temp_path = Path(settings.storage_path) / f"temp_{file_id}_{filename}"
+        temp_path.write_bytes(data)
 
-        # Generate embeddings for all chunks in parallel (using thread pool)
-        embedder = get_embedding_service()
-        vectors = await embedder.embed_batch(chunks)
+        try:
+            artifact = parser.load(str(temp_path))
+            document = parser.parse(artifact, filename)
 
-        # Index chunks with their embeddings
-        await self.es_repo.bulk_index_chunks(document_id, chunks, vectors)
-        return len(chunks)
+            # Refine chunks using the ChunkingService
+            refined_document = _CHUNK_SERVICE.chunk(document)
+
+            # Use the specialized DocumentRepository for ingestion
+            # which handles embeddings for content and all 3 levels of headings
+            count = await self.doc_repo.ingest_document(refined_document)
+            return count
+        finally:
+            if temp_path.exists():
+                temp_path.unlink()
