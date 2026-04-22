@@ -45,7 +45,7 @@ class Orchestrator:
         chat_id: int,
         user_id: int,
         history: list[dict[str, str]],
-        file_ids: list[int],
+        file_ids: list[str],
         use_web_search: bool,
         forced_agent: Optional[AgentType],
         summarization_mode: SummarizationMode,

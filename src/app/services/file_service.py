@@ -80,7 +80,7 @@ class FileService:
         file_record = await self.file_repo.update(file_record.id, path=str(dest))
 
         # 4. Parse + chunk + index (synchronously for now; move to bg task if slow).
-        chunk_count = await self._index_file(file_record.id, mime_type, data, original_name)
+        chunk_count = await self._index_file(file_record.id, str(file_record.document_id), mime_type, data, original_name)
 
         file_record = await self.file_repo.update(
             file_record.id, is_indexed=True, chunk_count=chunk_count
@@ -102,7 +102,7 @@ class FileService:
             return False
 
         # Remove from ES
-        await self.es_repo.delete_document_chunks(file_id)
+        await self.es_repo.delete_document_chunks(str(file.document_id))
 
         # Remove from disk
         path = Path(file.path)
@@ -130,7 +130,7 @@ class FileService:
     # ------------------------------------------------------------------ #
 
     async def _index_file(
-        self, file_id: int, mime_type: str, data: bytes, filename: str
+        self, file_id: int, document_id: str, mime_type: str, data: bytes, filename: str
     ) -> int:
         parser = _PARSERS[mime_type]
         parsed = parser.parse_bytes(data, filename)
@@ -147,5 +147,5 @@ class FileService:
         vectors = await embedder.embed_batch(chunks)
 
         # Index chunks with their embeddings
-        await self.es_repo.bulk_index_chunks(file_id, chunks, vectors)
+        await self.es_repo.bulk_index_chunks(document_id, chunks, vectors)
         return len(chunks)

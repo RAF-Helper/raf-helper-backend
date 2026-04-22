@@ -114,7 +114,7 @@ async def get_events_documents(
 
 async def get_materials_fragments(
     query: str,
-    document_ids: Optional[list[int]] = None,
+    document_ids: Optional[list[str]] = None,
     return_chunks: bool = False,
     k: int = 5,
     use_web_search: bool = False,

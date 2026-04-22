@@ -294,16 +294,32 @@ class ElasticsearchRepository:
 
     async def index_context_chunk(
         self,
-        document_id: int,
+        document_id: str,
         chunk_index: int,
         chunk_text: str,
         chunk_vector: Optional[list[float]] = None,
+        chunk_reference_level_1: Optional[str] = None,
+        chunk_reference_level_1_vector: Optional[list[float]] = None,
+        chunk_reference_level_2: Optional[str] = None,
+        chunk_reference_level_2_vector: Optional[list[float]] = None,
+        chunk_reference_level_3: Optional[str] = None,
+        chunk_reference_level_3_vector: Optional[list[float]] = None,
+        chunk_reference_metadata: Optional[dict[str, Any]] = None,
     ) -> str:
         """Index a single document chunk.
 
         Args:
-            chunk_vector: dense embedding of *chunk_text* (LLM stub).
-                          Pass None to skip semantic indexing.
+            document_id: UUID of the document (as string)
+            chunk_index: position of chunk in document
+            chunk_text: text content of the chunk
+            chunk_vector: dense embedding of chunk_text
+            chunk_reference_level_1: reference level 1 (e.g., chapter/slide number)
+            chunk_reference_level_1_vector: embedding of level 1 reference
+            chunk_reference_level_2: reference level 2 (e.g., section title)
+            chunk_reference_level_2_vector: embedding of level 2 reference
+            chunk_reference_level_3: reference level 3 (e.g., subsection title)
+            chunk_reference_level_3_vector: embedding of level 3 reference
+            chunk_reference_metadata: additional metadata about the chunk
         """
         doc: dict[str, Any] = {
             "document_id": document_id,
@@ -313,18 +329,40 @@ class ElasticsearchRepository:
         }
         if chunk_vector is not None:
             doc["chunk_vector"] = chunk_vector
+        if chunk_reference_level_1 is not None:
+            doc["chunk_reference_level_1"] = chunk_reference_level_1
+        if chunk_reference_level_1_vector is not None:
+            doc["chunk_reference_level_1_vector"] = chunk_reference_level_1_vector
+        if chunk_reference_level_2 is not None:
+            doc["chunk_reference_level_2"] = chunk_reference_level_2
+        if chunk_reference_level_2_vector is not None:
+            doc["chunk_reference_level_2_vector"] = chunk_reference_level_2_vector
+        if chunk_reference_level_3 is not None:
+            doc["chunk_reference_level_3"] = chunk_reference_level_3
+        if chunk_reference_level_3_vector is not None:
+            doc["chunk_reference_level_3_vector"] = chunk_reference_level_3_vector
+        if chunk_reference_metadata is not None:
+            doc["chunk_reference_metadata"] = chunk_reference_metadata
         return await self.index_document(CONTEXT_MATERIALS_INDEX, doc)
 
     async def bulk_index_chunks(
         self,
-        document_id: int,
+        document_id: str,
         chunks: list[str],
         vectors: Optional[list[list[float]]] = None,
+        reference_levels: Optional[list[dict[str, Any]]] = None,
     ) -> int:
         """Bulk-index all chunks for a document.
 
         Args:
-            vectors: pre-computed embeddings aligned with *chunks* (LLM stub).
+            document_id: UUID of the document (as string)
+            chunks: list of text chunks
+            vectors: pre-computed embeddings for chunk_text
+            reference_levels: list of dicts with optional keys:
+                - level_1, level_1_vector
+                - level_2, level_2_vector
+                - level_3, level_3_vector
+                - metadata
         """
         now = datetime.now(timezone.utc).isoformat()
         docs = []
@@ -337,10 +375,26 @@ class ElasticsearchRepository:
             }
             if vectors and i < len(vectors):
                 doc["chunk_vector"] = vectors[i]
+            if reference_levels and i < len(reference_levels):
+                ref = reference_levels[i]
+                if ref.get("level_1"):
+                    doc["chunk_reference_level_1"] = ref["level_1"]
+                if ref.get("level_1_vector"):
+                    doc["chunk_reference_level_1_vector"] = ref["level_1_vector"]
+                if ref.get("level_2"):
+                    doc["chunk_reference_level_2"] = ref["level_2"]
+                if ref.get("level_2_vector"):
+                    doc["chunk_reference_level_2_vector"] = ref["level_2_vector"]
+                if ref.get("level_3"):
+                    doc["chunk_reference_level_3"] = ref["level_3"]
+                if ref.get("level_3_vector"):
+                    doc["chunk_reference_level_3_vector"] = ref["level_3_vector"]
+                if ref.get("metadata"):
+                    doc["chunk_reference_metadata"] = ref["metadata"]
             docs.append(doc)
         return await self.bulk_index(CONTEXT_MATERIALS_INDEX, docs)
 
-    async def delete_document_chunks(self, document_id: int) -> int:
+    async def delete_document_chunks(self, document_id: str) -> int:
         """Remove all chunks belonging to a document from the index."""
         return await self.delete_by_query(
             CONTEXT_MATERIALS_INDEX,
@@ -350,15 +404,15 @@ class ElasticsearchRepository:
     async def search_context(
         self,
         query: str,
-        document_ids: Optional[list[int]] = None,
+        document_ids: Optional[list[str]] = None,
         limit: int = 10,
         query_vector: Optional[list[float]] = None,
     ) -> list[dict[str, Any]]:
         """RAG retrieval over context material chunks.
 
         Args:
-            document_ids: restrict search to chunks from these PG file IDs.
-            query_vector:  dense embedding of *query* for semantic search.
+            document_ids: restrict search to chunks from these document UUIDs (as strings).
+            query_vector: dense embedding of *query* for semantic search.
         """
         must: list[dict] = [
             {
