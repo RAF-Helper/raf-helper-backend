@@ -40,4 +40,4 @@ class DocumentSearchRequest(BaseModel):
     """Request schema for searching document materials."""
     query: str
     limit: int = 5
-    document_ids: Optional[list[str]] = None
+    document_ids: Optional[list[int]] = None

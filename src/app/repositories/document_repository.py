@@ -1,11 +1,14 @@
 """Document repository for parsing pipeline."""
 
+import asyncio
 from datetime import datetime, timezone
+import logging
 from typing import Any, Optional
 from uuid import UUID
 
 from ..elastic.index_manager import CONTEXT_MATERIALS_INDEX
 from ..repositories.elasticsearch_repository import ElasticsearchRepository
+from ..repositories.postgres_repository import FileMetadataRepository
 from ..schemas.document import Document, DocumentChunk
 from ..services.embedding_service import get_embedding_service
 
@@ -13,8 +16,9 @@ from ..services.embedding_service import get_embedding_service
 class DocumentRepository:
     """Repository for document ingestion and search with full pipeline."""
 
-    def __init__(self):
+    def __init__(self, session):
         self._es_repo = ElasticsearchRepository()
+        self._fm_repo = FileMetadataRepository(session)
         self._embedder = get_embedding_service()
 
     async def ingest_document(self, document: Document) -> int:
@@ -41,14 +45,16 @@ class DocumentRepository:
         level2_texts = [chunk.level2 for chunk in document.document_chunks if chunk.level2]
         level3_texts = [chunk.level3 for chunk in document.document_chunks if chunk.level3]
 
+
         level1_vectors = await self._embedder.embed_batch(level1_texts) if level1_texts else []
         level2_vectors = await self._embedder.embed_batch(level2_texts) if level2_texts else []
         level3_vectors = await self._embedder.embed_batch(level3_texts) if level3_texts else []
 
         # Build index vectors
-        level1_vec_map = {chunk.level1: level1_vectors[i] for i, chunk in enumerate(document.document_chunks) if chunk.level1}
-        level2_vec_map = {chunk.level2: level2_vectors[i] for i, chunk in enumerate(document.document_chunks) if chunk.level2}
-        level3_vec_map = {chunk.level3: level3_vectors[i] for i, chunk in enumerate(document.document_chunks) if chunk.level3}
+        level1_vec_map = {chunk.level1: level1_vectors[i] for i, chunk in enumerate(document.document_chunks) if chunk.level1 and i < len(level1_vectors)}
+        level2_vec_map = {chunk.level2: level2_vectors[i] for i, chunk in enumerate(document.document_chunks) if chunk.level2 and i < len(level2_vectors)}
+        level3_vec_map = {chunk.level3: level3_vectors[i] for i, chunk in enumerate(document.document_chunks) if chunk.level3 and i < len(level3_vectors)}
+
 
         # Build documents for indexing
         docs = []
@@ -64,20 +70,23 @@ class DocumentRepository:
             # Add level 1
             if chunk.level1:
                 doc["chunk_reference_level_1"] = chunk.level1
-                if chunk.level1 in level1_vec_map:
-                    doc["chunk_reference_level_1_vector"] = level1_vec_map[chunk.level1]
+                vec = level1_vec_map.get(chunk.level1)
+                if vec:
+                    doc["chunk_reference_level_1_vector"] = vec
 
             # Add level 2
             if chunk.level2:
                 doc["chunk_reference_level_2"] = chunk.level2
-                if chunk.level2 in level2_vec_map:
-                    doc["chunk_reference_level_2_vector"] = level2_vec_map[chunk.level2]
+                vec = level2_vec_map.get(chunk.level2)
+                if vec:
+                    doc["chunk_reference_level_2_vector"] = vec
 
             # Add level 3
             if chunk.level3:
                 doc["chunk_reference_level_3"] = chunk.level3
-                if chunk.level3 in level3_vec_map:
-                    doc["chunk_reference_level_3_vector"] = level3_vec_map[chunk.level3]
+                vec = level3_vec_map.get(chunk.level3)
+                if vec:
+                    doc["chunk_reference_level_3_vector"] = vec
 
             # Add metadata
             if chunk.metadata:
@@ -87,12 +96,13 @@ class DocumentRepository:
 
         return await self._es_repo.bulk_index(CONTEXT_MATERIALS_INDEX, docs)
 
+
     async def search(
         self,
         query: str,
-        document_ids: list[str],
+        document_ids: list[int],
+        return_chunks: bool,
         k: int = 5,
-        return_chunks: bool = False,
     ) -> list[dict[str, Any]]:
         """Full search pipeline: vector similarity + fuzzy text match.
 
@@ -106,7 +116,10 @@ class DocumentRepository:
             List of matching chunks or document summaries
         """
         # Generate query embedding
-        query_vector = await self._embedder.embed_text(query)
+        embed_task = self._embedder.embed_text(query)
+        uuid_task = self._fm_repo.get_uuids(document_ids)
+
+        query_vector, document_uuids = await asyncio.gather(embed_task, uuid_task)
 
         # Build ES query with:
         # - should: knn on chunk_vector (cosine similarity)
@@ -126,8 +139,8 @@ class DocumentRepository:
         ]
 
         filter_: list[dict] = []
-        if document_ids:
-            filter_.append({"terms": {"document_id": document_ids}})
+        if document_uuids:
+            filter_.append({"terms": {"document_id": [str(u) for u in document_uuids]}})
 
         # Build should clauses for vector similarity
         should: list[dict] = [
@@ -155,6 +168,10 @@ class DocumentRepository:
             query=es_query,
             size=k,
         )
+
+        for result in results:
+            doc = await self._fm_repo.get_by_uuid(result["document_id"])
+            result['name'] = doc.name or doc.original_name
 
         if not results:
             return []

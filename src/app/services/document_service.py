@@ -35,7 +35,7 @@ class DocumentService:
         self.session = session
         self.file_repo = FileMetadataRepository(session)
         self.ctx_repo = ChatContextRepository(session)
-        self.doc_repo = DocumentRepository()
+        self.doc_repo = DocumentRepository(session)
         self.es_repo = es_repo or ElasticsearchRepository()
 
     # ------------------------------------------------------------------ #
@@ -131,9 +131,9 @@ class DocumentService:
     async def search_materials(
         self,
         query: str,
-        document_ids: list[str],
+        document_ids: list[int],
         k: int = 5,
-        return_chunks: bool = False,
+        return_chunks: bool = True,
     ) -> list[dict]:
         """Search materials via the DocumentRepository pipeline."""
         return await self.doc_repo.search(
@@ -158,6 +158,7 @@ class DocumentService:
         try:
             artifact = parser.load(str(temp_path))
             document = parser.parse(artifact, filename)
+            document.id = document_id
 
             # Refine chunks using the ChunkingService
             refined_document = _CHUNK_SERVICE.chunk(document)
