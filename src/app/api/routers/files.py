@@ -1,5 +1,7 @@
 """File upload and management endpoints."""
 
+import logging
+
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -63,12 +65,12 @@ async def upload_file(
     return FileUploadResponse(file=FileRead.model_validate(record))
 
 
-@router.post("/search", response_model=list[DocumentChunk])
+@router.post("/search")
 async def search_files(
     request: DocumentSearchRequest,
     firebase_uid: str = Depends(verify_firebase_token),
     session: AsyncSession = Depends(get_session),
-) -> list[DocumentChunk]:
+):
     """Search for materials across uploaded documents."""
     user_id = await _resolve_user_id(firebase_uid, session)
     svc = DocumentService(session)
@@ -86,7 +88,7 @@ async def list_files(
 ) -> list[FileRead]:
     """List all files uploaded by the current user."""
     user_id = await _resolve_user_id(firebase_uid, session)
-    svc = FileService(session)
+    svc = DocumentService(session)
     files = await svc.list_user_files(user_id)
     return [FileRead.model_validate(f) for f in files]
 
@@ -99,7 +101,7 @@ async def get_file(
 ) -> FileRead:
     """Get metadata for a specific file."""
     user_id = await _resolve_user_id(firebase_uid, session)
-    svc = FileService(session)
+    svc = DocumentService(session)
     file = await svc.get_file(file_id, user_id)
     if not file:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found.")
@@ -114,7 +116,7 @@ async def delete_file(
 ) -> None:
     """Delete a file and remove its chunks from the search index."""
     user_id = await _resolve_user_id(firebase_uid, session)
-    svc = FileService(session)
+    svc = DocumentService(session)
     deleted = await svc.delete_file(file_id, user_id)
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found.")
