@@ -34,3 +34,10 @@ class Document(BaseModel):
     filename: str
     format: DocumentFormat
     document_chunks: list[DocumentChunk] = []
+
+
+class DocumentSearchRequest(BaseModel):
+    """Request schema for searching document materials."""
+    query: str
+    limit: int = 5
+    document_ids: Optional[list[str]] = None

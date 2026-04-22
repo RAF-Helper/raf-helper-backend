@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...db.session import get_session
 from ...services.document_service import DocumentService, UnsupportedFileTypeError
+from ...schemas.document import DocumentSearchRequest, DocumentChunk
 from ...services.user_service import UserService
 from ..auth.firebase import verify_firebase_token
 from ...schemas.file import FileRead, FileUploadResponse
@@ -61,6 +62,22 @@ async def upload_file(
 
     return FileUploadResponse(file=FileRead.model_validate(record))
 
+
+@router.post("/search", response_model=list[DocumentChunk])
+async def search_files(
+    request: DocumentSearchRequest,
+    firebase_uid: str = Depends(verify_firebase_token),
+    session: AsyncSession = Depends(get_session),
+) -> list[DocumentChunk]:
+    """Search for materials across uploaded documents."""
+    user_id = await _resolve_user_id(firebase_uid, session)
+    svc = DocumentService(session)
+    results = await svc.search_materials(
+        query=request.query,
+        document_ids=request.document_ids,
+        k=request.limit
+    )
+    return results
 
 @router.get("/", response_model=list[FileRead])
 async def list_files(
