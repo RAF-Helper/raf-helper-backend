@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     langfuse_host: str = "https://cloud.langfuse.com"
 
     # File storage
-    storage_path: str = Field(default="./storage", alias="STORAGE_PATH")
+    storage_path: str = Field(default="./storage/files", alias="STORAGE_PATH")
 
     # Chunking
     chunk_size: int = Field(default=1000, alias="CHUNK_SIZE")
