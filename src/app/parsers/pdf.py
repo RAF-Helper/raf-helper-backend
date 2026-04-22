@@ -2,39 +2,44 @@
 
 import io
 from pathlib import Path
-from typing import Any
+from uuid import uuid4
 
 from pypdf import PdfReader
 
 from .base import BaseParser
+from ..schemas.document import Document, DocumentChunk, DocumentFormat
 
-
-class PDFParser(BaseParser):
+class PDFParser(BaseParser[PdfReader]):
     """Parser for PDF documents."""
 
-    def parse_file(self, file_path: str | Path) -> dict[str, Any]:
-        with open(file_path, "rb") as f:
-            return self._parse(f.read(), str(Path(file_path).name))
+    def load(self, filename: str) -> PdfReader:
+        """Load PDF into a PdfReader object."""
+        with open(filename, "rb") as f:
+            return PdfReader(io.BytesIO(f.read()))
 
-    def parse_bytes(self, data: bytes, filename: str | None = None) -> dict[str, Any]:
-        return self._parse(data, filename or "document.pdf")
+    def parse(self, artifact: PdfReader, filename: str) -> Document:
+        """Parse PDF into a Document model with structural blocks (pages)."""
+        pages_chunks: list[DocumentChunk] = []
 
-    def _parse(self, data: bytes, filename: str) -> dict[str, Any]:
-        reader = PdfReader(io.BytesIO(data))
-        pages_text: list[str] = []
-        for page in reader.pages:
+        # For the initial version, we treat each page as a structural block.
+        # Real structural extraction (headings) would happen here.
+        for i, page in enumerate(artifact.pages):
             text = page.extract_text() or ""
-            pages_text.append(text.strip())
+            if text.strip():
+                pages_chunks.append(DocumentChunk(
+                    content=text.strip(),
+                    level1=None,
+                    level2=None,
+                    level3=None,
+                    metadata={"page_number": i + 1}
+                ))
 
-        full_text = "\n\n".join(p for p in pages_text if p)
-        info = reader.metadata or {}
+        info = artifact.metadata or {}
 
-        return {
-            "text": full_text,
-            "metadata": {
-                "filename": filename,
-                "page_count": len(reader.pages),
-                "title": info.get("/Title", ""),
-                "author": info.get("/Author", ""),
-            },
-        }
+        return Document(
+            id=uuid4(),
+            name=info.get("/Title", Path(filename).stem),
+            filename=Path(filename).name,
+            format=DocumentFormat.PDF,
+            document_chunks=pages_chunks
+        )

@@ -2,35 +2,42 @@
 
 import io
 from pathlib import Path
-from typing import Any
+from uuid import uuid4
 
-from docx import Document
+from docx import Document as DocxDocument
 
 from .base import BaseParser
+from ..schemas.document import Document, DocumentChunk, DocumentFormat
 
-
-class DocxParser(BaseParser):
+class DocxParser(BaseParser[DocxDocument]):
     """Parser for DOCX documents."""
 
-    def parse_file(self, file_path: str | Path) -> dict[str, Any]:
-        with open(file_path, "rb") as f:
-            return self._parse(f.read(), str(Path(file_path).name))
+    def load(self, filename: str) -> DocxDocument:
+        """Load DOCX file into a Document object."""
+        return DocxDocument(filename)
 
-    def parse_bytes(self, data: bytes, filename: str | None = None) -> dict[str, Any]:
-        return self._parse(data, filename or "document.docx")
+    def parse(self, artifact: DocxDocument, filename: str) -> Document:
+        """Parse DOCX into a Document model."""
+        chunks: list[DocumentChunk] = []
 
-    def _parse(self, data: bytes, filename: str) -> dict[str, Any]:
-        doc = Document(io.BytesIO(data))
-        paragraphs = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
-        full_text = "\n\n".join(paragraphs)
+        # Basic structural extraction: group by paragraphs
+        # Future improvement: detect headings to populate level1, level2, etc.
+        for p in artifact.paragraphs:
+            text = p.text.strip()
+            if text:
+                chunks.append(DocumentChunk(
+                    content=text,
+                    level1=None,
+                    level2=None,
+                    level3=None,
+                    metadata={"page_number": 1} # python-docx doesn't provide page numbers easily
+                ))
 
-        core = doc.core_properties
-        return {
-            "text": full_text,
-            "metadata": {
-                "filename": filename,
-                "title": core.title or "",
-                "author": core.author or "",
-                "paragraph_count": len(paragraphs),
-            },
-        }
+        core = artifact.core_properties
+        return Document(
+            id=uuid4(),
+            name=core.title or Path(filename).stem,
+            filename=Path(filename).name,
+            format=DocumentFormat.DOCX,
+            document_chunks=chunks
+        )

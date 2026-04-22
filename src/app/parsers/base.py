@@ -2,37 +2,38 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar, Generic
 
+from ..schemas.document import Document
 
-class BaseParser(ABC):
+T = TypeVar("T")
+
+class BaseParser(ABC, Generic[T]):
     """Base parser interface for document parsing."""
 
     @abstractmethod
-    def parse_file(self, file_path: str | Path) -> dict[str, Any]:
+    def load(self, filename: str) -> T:
         """
-        Parse a document from file path.
+        Load the file and extract the artifact required for parsing.
 
         Args:
-            file_path: Path to the document file
+            filename: Path to the file to load.
 
         Returns:
-            Dictionary with parsed content and metadata
-                - "text": str (main text content)
-                - "metadata": dict (additional metadata)
+            The artifact (e.g., a library-specific document object) used for parsing.
         """
         pass
 
     @abstractmethod
-    def parse_bytes(self, data: bytes, filename: str | None = None) -> dict[str, Any]:
+    def parse(self, artifact: T, filename: str) -> Document:
         """
-        Parse a document from binary data.
+        Parse the artifact into a Document model.
 
         Args:
-            data: Raw file bytes
-            filename: Optional filename for metadata
+            artifact: The artifact produced by the load method.
+            filename: The name of the file being parsed.
 
         Returns:
-            Dictionary with parsed content and metadata
+            A parsed Document object containing chunks and metadata.
         """
         pass
