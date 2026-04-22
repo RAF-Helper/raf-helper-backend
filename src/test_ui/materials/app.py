@@ -27,7 +27,7 @@ async def api_call(method, endpoint, data=None, json=None, files=None, headers=N
         # or we mock the auth header.
         auth_headers = headers or {}
         if firebase_uid:
-            auth_headers["x-firebase-uid"] = firebase_uid  # Custom header for testing mock auth
+            auth_headers["Authorization"] = f'Bearer {firebase_uid}'  # Custom header for testing mock auth
 
         response = await client.request(
             method,
@@ -36,7 +36,7 @@ async def api_call(method, endpoint, data=None, json=None, files=None, headers=N
             json=json,
             files=files,
             headers=auth_headers,
-            timeout=30.0
+            timeout=900.0
         )
         return response
 
@@ -59,22 +59,54 @@ with tab1:
                     # Prepare file for upload
                     files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
                     try:
-                        resp = run_async(api_call("POST", "/files/", files=files))
-                        if resp.status_code == 201:
-                            st.success(f"Successfully uploaded: {uploaded_file.name}")
-                            st.json(resp.json())
-                        else:
+                        # sync user
+                        resp = run_async(api_call("POST", "/auth/sync"))
+                        if resp.status_code >= 400:
                             st.error(f"Upload failed: {resp.status_code}\n{resp.text}")
+                        else:
+                            resp = run_async(api_call("POST", "/files/", files=files))
+                            if resp.status_code == 201:
+                                st.success(f"Successfully uploaded: {uploaded_file.name}")
+                                st.json(resp.json())
+                            else:
+                                st.error(f"Upload failed: {resp.status_code}\n{resp.text}")
                     except Exception as e:
-                        st.error(f"An error occurred: {e}")
+                        st.error(f"An error occurred: {e} {str(e)} {e.args}")
 
 with tab2:
     st.header("Search Materials")
+
+    # Document Selection
+    st.subheader("Filter by Documents")
+    if not firebase_uid:
+        st.info("Provide Firebase UID in sidebar to load documents.")
+        selected_docs = []
+    else:
+        try:
+            files_resp = run_async(api_call("GET", "/files/"))
+            if files_resp.status_code == 200:
+                all_files = files_resp.json()
+                #st.json(all_files)
+                file_options = {f["original_name"]: f["id"] for f in all_files}
+                selected_filenames = st.multiselect(
+                    "Select documents to search in (leave empty for all)",
+                    options=list(file_options.keys())
+                )
+                selected_docs = [str(file_options[name]) for name in selected_filenames]
+            else:
+                st.error(f"Failed to fetch documents: {files_resp.status_code}")
+                selected_docs = []
+        except Exception as e:
+            st.error(f"Error loading documents: {e}")
+            selected_docs = []
+
+    st.divider()
     col1, col2 = st.columns([3, 1])
     with col1:
         query = st.text_input("Search Query", placeholder="Enter a keyword or phrase...")
     with col2:
         limit = st.number_input("Limit", min_value=1, max_value=20, value=5)
+
 
     if st.button("Search"):
         if not firebase_uid:
@@ -84,8 +116,13 @@ with tab2:
         else:
             with st.spinner("Searching..."):
                 try:
-                    payload = {"query": query, "limit": limit}
+                    payload = {
+                        "query": query,
+                        "limit": limit,
+                        "document_ids": selected_docs
+                    }
                     resp = run_async(api_call("POST", "/files/search", json=payload))
+
 
                     # Correction: if the API expects JSON body (which it does via DocumentSearchRequest),
                     # we should use json= instead of data= in httpx.
@@ -93,22 +130,24 @@ with tab2:
 
                     if resp.status_code == 200:
                         results = resp.json()
+                        # st.json(results)
                         if not results:
                             st.info("No results found.")
                         else:
                             st.subheader(f"Top {len(results)} Results")
                             for idx, chunk in enumerate(results):
-                                with st.expander(f"Result {idx+1} - Page {chunk.get('metadata', {}).get('page_number', 'Unknown')}"):
+                                with st.expander(f"Result {idx+1} - Page {chunk.get('chunk_reference_metadata', {}).get('page_number', 'Unknown')}"):
                                     # Structural Hierarchy
+                                    st.markdown(f"**Filename:** {chunk.get("name", "Unknown name")}")
                                     st.markdown("**Hierarchy:**")
-                                    l1 = chunk.get("level1") or "N/A"
-                                    l2 = chunk.get("level2") or "N/A"
-                                    l3 = chunk.get("level3") or "N/A"
+                                    l1 = chunk.get("chunk_reference_level_1") or "N/A"
+                                    l2 = chunk.get("chunk_reference_level_2") or "N/A"
+                                    l3 = chunk.get("chunk_reference_level_3") or "N/A"
                                     st.markdown(f"`{l1}` $\\rightarrow$ `{l2}` $\\rightarrow$ `{l3}`")
 
                                     st.divider()
                                     st.markdown("**Content:**")
-                                    st.write(chunk.get("content", ""))
+                                    st.write(chunk.get("chunk_text", ""))
                     else:
                         st.error(f"Search failed: {resp.status_code}\n{resp.text}")
                 except Exception as e:
