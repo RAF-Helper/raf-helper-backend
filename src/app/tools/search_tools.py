@@ -7,6 +7,8 @@ from datetime import datetime
 from ..repositories.elasticsearch_repository import ElasticsearchRepository
 from ..services.embedding_service import EmbeddingService
 from ..services.tavily_service import get_tavily_service
+from ..services.document_service import DocumentService
+from ..db.session import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -134,75 +136,65 @@ async def get_materials_fragments(
     Returns:
         Formatted string with matching fragments or document summaries.
     """
-    repo = _get_repo()
-    embedder = _get_embedder()
-
-    vector = await embedder.embed_text(query)
-
-    # Search in Elasticsearch
-    results = await repo.search_context(
-        query=query,
-        document_ids=document_ids,
-        limit=k,
-        query_vector=vector,
-    )
-
-    # Build response from ES results
-    if results:
-        if return_chunks:
-            # Return individual chunks
-            lines = []
-            for r in results:
-                lines.append(
-                    f"[Doc {r['document_id']}, Chunk {r['chunk_index']}]\n{r['chunk_text']}"
+    # 1. Internal Knowledge Base Search
+    internal_content = ""
+    if document_ids:
+        try:
+            async with AsyncSessionLocal() as session:
+                doc_service = DocumentService(session)
+                results = await doc_service.search_materials(
+                    query=query,
+                    document_ids=document_ids,
+                    k=k,
+                    return_chunks=return_chunks,
                 )
-            es_content = "\n\n".join(lines)
-        else:
-            # Aggregate by document
-            docs: dict[int, list[str]] = {}
-            for r in results:
-                doc_id = r["document_id"]
-                if doc_id not in docs:
-                    docs[doc_id] = []
-                docs[doc_id].append(r["chunk_text"])
 
-            lines = []
-            for doc_id, chunks in docs.items():
-                preview = "\n".join(chunks[:2])  # First 2 chunks as preview
-                lines.append(f"Document {doc_id}:\n{preview}")
-            es_content = "\n\n".join(lines)
-    else:
-        es_content = ""
+                if results:
+                    lines = ["[Internal Knowledge Base]"]
+                    if return_chunks:
+                        # Results are chunks: list[dict]
+                        for r in results:
+                            lines.append(
+                                f"[Doc {r['document_id']}, Chunk {r.get('chunk_index', 'N/A')}]\n{r['chunk_text']}"
+                            )
+                    else:
+                        # Results are full documents: list[dict] with 'name', 'content'
+                        for r in results:
+                            lines.append(
+                                f"Document {r['name']} ({r['document_id']}):\n{r['content']}"
+                            )
+                    internal_content = "\n\n".join(lines)
+        except Exception as e:
+            logger.error(f"Error during internal material search: {e}", exc_info=True)
+            internal_content = "Error retrieving internal materials."
 
-    # If web search is enabled, also search the web
+    # 2. Web Search
+    web_content = ""
     if use_web_search:
-        tavily = get_tavily_service()
-        web_results = await tavily.search(query, include_raw_content=True)
+        try:
+            tavily = get_tavily_service()
+            web_results = await tavily.search(query, include_raw_content=True)
 
-        if web_results:
-            web_lines = ["[Web Search Results]"]
-            for i, r in enumerate(web_results, 1):
-                web_lines.append(
-                    f"{i}. {r['title']}\n   {r['url']}\n   {r['content']}"
-                )
-            web_content = "\n".join(web_lines)
-        else:
-            web_content = ""
+            if web_results:
+                web_lines = ["[Web Search Results]"]
+                for i, r in enumerate(web_results, 1):
+                    web_lines.append(
+                        f"{i}. {r['title']}\n   {r['url']}\n   {r['content']}"
+                    )
+                web_content = "\n".join(web_lines)
+        except Exception as e:
+            logger.error(f"Error during web search: {e}", exc_info=True)
+            web_content = "Error performing web search."
 
-        # Combine ES and web results
-        if es_content and web_content:
-            return f"{es_content}\n\n---\n\n{web_content}"
-        elif web_content:
-            return web_content
-        elif es_content:
-            return es_content
-        else:
-            return "No relevant document fragments found."
-
-    # No web search, return only ES results
-    if es_content:
-        return es_content
-    return "No relevant document fragments found."
+    # 3. Combine and Return
+    if internal_content and web_content:
+        return f"{internal_content}\n\n---\n\n{web_content}"
+    elif internal_content:
+        return internal_content
+    elif web_content:
+        return web_content
+    else:
+        return "No relevant document fragments found."
 
 
 # ============ OpenAI Tool Definitions ============

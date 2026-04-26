@@ -1,6 +1,7 @@
 """Document service for upload, parsing, chunking and ES indexing."""
 
 from pathlib import Path
+import logging
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -128,6 +129,26 @@ class DocumentService:
         files = await self.ctx_repo.get_files_for_chat(chat_id)
         return [f.id for f in files]
 
+    async def get_full_document_text(self, document_id: str) -> str:
+        """Retrieve full text of a document by re-parsing it from storage."""
+        file_record = await self.file_repo.get_by_uuid(document_id)
+        if not file_record:
+            return ""
+
+        parser = _PARSERS.get(file_record.mime_type, _PARSERS["text/plain"])
+
+        try:
+            # Load and parse from the stored path
+            artifact = parser.load(file_record.path)
+            document = parser.parse(artifact, file_record.original_name)
+
+            # Concatenate all chunk contents
+            full_text = "\n".join([chunk.content for chunk in document.document_chunks])
+            return full_text
+        except Exception as e:
+            logging.error(f"Error re-parsing document {document_id} from {file_record.path}: {e}")
+            return ""
+
     async def search_materials(
         self,
         query: str,
@@ -136,12 +157,35 @@ class DocumentService:
         return_chunks: bool = True,
     ) -> list[dict]:
         """Search materials via the DocumentRepository pipeline."""
-        return await self.doc_repo.search(
+        results = await self.doc_repo.search(
             query=query,
             document_ids=document_ids,
             k=k,
             return_chunks=return_chunks
         )
+
+        if return_chunks or not results:
+            return results
+
+        # return_chunks=False: aggregate by document and retrieve full text
+        full_docs = []
+        for res in results:
+            doc_id = res["document_id"]
+            # TODO: Implement summarization for full text of documents that overwhelm the model's context
+            full_text = await self.get_full_document_text(doc_id)
+
+            # We can get the name from the repository's search result if available,
+            # or fetch it from file_repo.
+            file_record = await self.file_repo.get_by_uuid(doc_id)
+            name = file_record.original_name if file_record else "Unknown Document"
+
+            full_docs.append({
+                "document_id": doc_id,
+                "name": name,
+                "content": full_text
+            })
+
+        return full_docs
 
     # ------------------------------------------------------------------ #
     # Internal                                                              #
