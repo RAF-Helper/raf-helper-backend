@@ -46,14 +46,13 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 
 async def init_db() -> None:
     """Initialize database tables."""
-    async with engine.begin() as conn:
-        config = Config()
-        script_location = './alembic'
-        config.set_main_option('script_location', script_location)
-        config.set_main_option('sqlalchemy.url', settings.postgres_url)
-        logging.info('Running DB migrations in %r on %r', script_location, settings.postgres_url)
-        command.upgrade(config, 'head', sql=True)
-        logging.info('DB migrations ran successfully')
+    config = Config()
+    script_location = './alembic'
+    config.set_main_option('script_location', script_location)
+    config.set_main_option('sqlalchemy.url', settings.postgres_url)
+    logging.info('Running DB migrations in %r on %r', script_location, settings.postgres_url)
+    command.upgrade(config, 'head', sql=False)
+    logging.info('DB migrations ran successfully')
 
 
 async def close_db() -> None:
