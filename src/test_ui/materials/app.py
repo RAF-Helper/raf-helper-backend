@@ -83,19 +83,23 @@ with tab2:
         selected_docs = []
     else:
         try:
-            files_resp = run_async(api_call("GET", "/files/"))
-            if files_resp.status_code == 200:
-                all_files = files_resp.json()
-                #st.json(all_files)
-                file_options = {f["original_name"]: f["id"] for f in all_files}
-                selected_filenames = st.multiselect(
-                    "Select documents to search in (leave empty for all)",
-                    options=list(file_options.keys())
-                )
-                selected_docs = [str(file_options[name]) for name in selected_filenames]
+            resp = run_async(api_call("POST", "/auth/sync"))
+            if resp.status_code >= 400:
+                st.error(f"Upload failed: {resp.status_code}\n{resp.text}")
             else:
-                st.error(f"Failed to fetch documents: {files_resp.status_code}")
-                selected_docs = []
+                files_resp = run_async(api_call("GET", "/files/"))
+                if files_resp.status_code == 200:
+                    all_files = files_resp.json()
+                    #st.json(all_files)
+                    file_options = {f["original_name"]: f["id"] for f in all_files}
+                    selected_filenames = st.multiselect(
+                        "Select documents to search in (leave empty for all)",
+                        options=list(file_options.keys())
+                    )
+                    selected_docs = [str(file_options[name]) for name in selected_filenames]
+                else:
+                    st.error(f"Failed to fetch documents: {files_resp.status_code}")
+                    selected_docs = []
         except Exception as e:
             st.error(f"Error loading documents: {e}")
             selected_docs = []
