@@ -7,6 +7,7 @@ Routing strategy (two-stage):
 Falls back to keyword routing while embedding/LLM are not integrated.
 """
 
+import logging
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,7 +23,11 @@ from .agents.abstract_agent import AbstractAgent
 from .agents.presentation_agent import PresentationAgent
 from ..pii.presidio_masker import PIIMasker
 from .llm import OpenRouterClient, LLMMessage
+from ..services.embedding_service import get_embedding_service
+from ..repositories.routing_repository import RoutingRepository
+from ..config import settings
 
+logger = logging.getLogger(__name__)
 
 class Orchestrator:
     def __init__(self):
@@ -38,6 +43,8 @@ class Orchestrator:
             AgentType.presentation: PresentationAgent(llm_client),
         }
         self._pii = PIIMasker()
+        self._embedder = get_embedding_service()
+        self._routing_repo = RoutingRepository()
 
     async def process(
         self,
@@ -70,16 +77,50 @@ class Orchestrator:
         return await self._agents[agent_type].run(inp)
 
     async def _route(self, query: str) -> AgentType:
-        """Route query to the appropriate agent using LLM.
+        """Route query using two-stage pipeline: Semantic Search -> LLM Fallback.
 
-        Sends the query to the LLM with a routing prompt describing each agent,
-        then parses the response to select the best matching AgentType.
-        Falls back to QA agent if parsing fails.
+        1. Embed query and search for similar intents in Elasticsearch.
+        2. If the top route is confident and unambiguous, route immediately.
+        3. Otherwise, fallback to LLM-based routing.
         """
+        try:
+            # Stage 1: Semantic Routing
+            vector = await self._embedder.embed_text(query)
+            hits = await self._routing_repo.search_intents(vector, k=5)
+
+            if hits:
+                # Aggregate scores by route
+                route_scores: dict[str, list[float]] = {}
+                for hit in hits:
+                    rid = hit["route_id"]
+                    score = hit["score"]
+                    if rid not in route_scores:
+                        route_scores[rid] = []
+                    route_scores[rid].append(score)
+
+                # Calculate average similarity per route
+                averages = {rid: sum(s)/len(s) for rid, s in route_scores.items()}
+                sorted_routes = sorted(averages.items(), key=lambda x: x[1], reverse=True)
+
+                s1, r1 = sorted_routes[0]
+                s2 = sorted_routes[1][1] if len(sorted_routes) > 1 else 0.0
+
+                # Decision Engine: Threshold and Margin check
+                if s1 >= settings.routing_threshold and (s1 - s2) >= settings.routing_margin:
+                    logger.info(f"Semantic route found: {r1} (score: {s1:.4f}, margin: {s1-s2:.4f})")
+                    return AgentType(r1)
+
+                logger.info(f"Semantic routing ambiguous or low confidence (s1: {s1:.4f}, s2: {s2:.4f}). Falling back to LLM.")
+
+        except Exception as e:
+            logger.error(f"Error during semantic routing: {e}", exc_info=True)
+
+        # Stage 2: LLM Fallback
         return await self._llm_route(query)
 
+
     async def _llm_route(self, query: str) -> AgentType:
-        """Ask LLM to pick the best agent for the given query."""
+        """Ask LLM to pick the best agent for the given query using structured JSON output."""
         system = (
             "You are a routing assistant. Based on the user's query, choose the single best agent.\n\n"
             "Agents:\n"
@@ -90,7 +131,8 @@ class Orchestrator:
             "- summarizer: summarize uploaded materials\n"
             "- abstract: write an essay/abstract based on materials\n"
             "- presentation: create a presentation based on materials\n\n"
-            "Reply with ONLY the agent name, nothing else. "
+            "You must respond in JSON format with a single key 'route' containing the agent slug.\n"
+            "Example: {\"route\": \"qa\"}\n"
             "One of: support, events, staff, qa, summarizer, abstract, presentation"
         )
         messages = [
@@ -98,8 +140,25 @@ class Orchestrator:
             LLMMessage(role="user", content=query),
         ]
         try:
-            response = await self._llm.chat(messages=messages, temperature=0.0, max_tokens=20)
-            chosen = response.content.strip().lower().split()[0]
-            return AgentType(chosen)
-        except Exception:
+            # We use a low temperature for deterministic routing
+            response = await self._llm.chat(messages=messages, temperature=0.0, max_tokens=50)
+            content = response.content.strip()
+
+            # Basic JSON extraction in case the LLM adds markdown code blocks
+            if "```json" in content:
+                content = content.split("```json")[1].split("```")[0].strip()
+            elif "```" in content:
+                content = content.split("```")[1].split("```")[0].strip()
+
+            import json
+            data = json.loads(content)
+            chosen = data.get("route", "").strip().lower()
+
+            if chosen in AgentType.__members__:
+                return AgentType(chosen)
+
+            logger.warning(f"LLM returned invalid route: {chosen}. Falling back to QA.")
+            return AgentType.qa
+        except Exception as e:
+            logger.error(f"Error in LLM routing: {e}")
             return AgentType.qa
