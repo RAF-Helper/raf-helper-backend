@@ -327,3 +327,57 @@ For proper testing and incremental implementation of the system it is advised to
 8. Adjust search tools for agents to implement new logic for documents retrieval according to the requirements;
 9. Engineer the rest of the parsers for each extension;
 10. Documenting everything and perform heavy testing on real data.
+
+
+## Routing
+
+### Idea and pipeline
+
+The system should implement robust routing that routes requests properly with chat history in mind.
+
+The routing in multiagentic system is done via Orchestrator agent that processes the user's request with N last messages and determines where to route the request.
+
+### Available routes
+
+Possible routing outcomes (routes):
+- `support`: Support agent, all of the questions regatding how to use the app and all of the other unknown questions;
+- `summary`: Summarizer agent, User requests summary of some document(s) or some topic(s);
+- `qa`: QA agent, user asked some kind of question that is related to the materials or educational one that requires search;
+- `events`: Events agent, Questions regarding upcoming events and bonuses for participating in them;
+- `staff`: Staff agent, questions about staff;
+- `ar`: Returns command to open AR module, questions about getting to some room/place on the faculty;
+- `abstract`: Abstract agent, user asked to construct an abstract for the given topic;
+- `slides`: Slides (Presentation) agent, user asked to make a presentation on the topic.
+
+### Pipeline
+
+The routing flow in Orchestator agent is:
+1. Intent-wise comparison:
+  
+    - 1.1. The request is embedded and compared with similar entries in postgres using pgvector;
+  
+    - 1.2. Up to N examples are retrieved and ordered by their score;
+  
+    - 1.3. The route with the most relevant examples and the highest scores is used if minimal threshold is met;
+
+2. If threshold is too low ro diff of top-k routes is too low, we use fallback Router subagent:
+  
+    - 2.1 Router sub agent receives the request and chat history to determine the route using LLM call;
+
+3. Request is routed to appropriate agent or function (in case of AR module).
+
+The routing is core functionality to the missing graph of the multiagent system.
+
+### Database requirements
+
+The table for storing intents is required:
+- id: serial (internal id for the intent, PK);
+- text: text (text of the intent example);
+- text_embedding: vector(N) (vector of size N (determined by embedder));
+- route_id: int4 (id of the route to go, FK).
+
+With table for routes:
+- id: serial (internal id of route, PK);
+- name: varchar(16) (slug of the route).
+
+So pgvector is required to be installed. Tables are created in schema `vector` (not `public`).
