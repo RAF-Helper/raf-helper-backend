@@ -13,18 +13,31 @@ from ..repositories.document_repository import DocumentRepository
 from ..repositories.elasticsearch_repository import ElasticsearchRepository
 from ..services.embedding_service import get_embedding_service
 from ..services.chunking_service import ChunkingService
-from ..parsers import PDFParser, DocxParser, PptxParser, TextParser
+from ..parsers import PDFParser, DocxParser, PptxParser, TextParser, MdParser
 
 _PARSERS = {
     "application/pdf": PDFParser(),
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": DocxParser(),
     "application/vnd.openxmlformats-officedocument.presentationml.presentation": PptxParser(),
     "text/plain": TextParser(),
+    "text/markdown": MdParser(),
 }
 
 _CHUNK_SERVICE = ChunkingService()
 
 _ALLOWED_MIME_TYPES = set(_PARSERS.keys())
+
+# Mapping from file extensions to MIME types for fallback
+_EXTENSION_MIME_MAP = {
+    ".pdf": "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".doc": "application/msword",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".ppt": "application/vnd.ms-powerpoint",
+    ".md": "text/markdown",
+    ".txt": "text/plain",
+    ".rtf": "application/rtf",
+}
 
 
 class UnsupportedFileTypeError(Exception):
@@ -39,19 +52,19 @@ class DocumentService:
         self.doc_repo = DocumentRepository(session)
         self.es_repo = es_repo or ElasticsearchRepository()
 
-    # ------------------------------------------------------------------ #
-    # Storage helpers                                                       #
-    # ------------------------------------------------------------------ #
-
     def _storage_path(self, user_id: int, file_id: int, original_name: str) -> Path:
         base = Path(settings.storage_path) / str(user_id)
         base.mkdir(parents=True, exist_ok=True)
         ext = Path(original_name).suffix
         return base / f"{file_id}{ext}"
 
-    # ------------------------------------------------------------------ #
-    # Public API                                                            #
-    # ------------------------------------------------------------------ #
+    def _resolve_mime_type(self, mime_type: str, original_name: str) -> str:
+        """Resolve the correct MIME type, using extension as fallback."""
+        if mime_type in _ALLOWED_MIME_TYPES:
+            return mime_type
+        # Fallback: check extension
+        ext = Path(original_name).suffix.lower()
+        return _EXTENSION_MIME_MAP.get(ext, mime_type)
 
     async def upload(
         self,
@@ -61,6 +74,7 @@ class DocumentService:
         mime_type: str,
     ) -> FileMetadata:
         """Save file to disk, persist metadata, parse and index chunks."""
+        mime_type = self._resolve_mime_type(mime_type, original_name)
         if mime_type not in _ALLOWED_MIME_TYPES:
             raise UnsupportedFileTypeError(
                 f"Unsupported file type: {mime_type}. "
@@ -186,10 +200,6 @@ class DocumentService:
             })
 
         return full_docs
-
-    # ------------------------------------------------------------------ #
-    # Internal                                                              #
-    # ------------------------------------------------------------------ #
 
     async def _index_file(
         self, file_id: int, document_id: str, mime_type: str, data: bytes, filename: str
