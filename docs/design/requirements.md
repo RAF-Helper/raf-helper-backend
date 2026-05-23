@@ -353,15 +353,15 @@ Possible routing outcomes (routes):
 
 The routing flow in Orchestator agent is:
 1. Intent-wise comparison:
-  
+
     - 1.1. The request is embedded and compared with similar entries in postgres using pgvector;
-  
+
     - 1.2. Up to N examples are retrieved and ordered by their score;
-  
+
     - 1.3. The route with the most relevant examples and the highest scores is used if minimal threshold is met;
 
 2. If threshold is too low ro diff of top-k routes is too low, we use fallback Router subagent:
-  
+
     - 2.1 Router sub agent receives the request and chat history to determine the route using LLM call;
 
 3. Request is routed to appropriate agent or function (in case of AR module).
