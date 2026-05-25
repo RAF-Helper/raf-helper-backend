@@ -8,7 +8,7 @@ jobs:
     runs-on: self-hosted
 
     env:
-      PROJECT_DIR: $HOME/raf-helper-backend
+      PROJECT_DIR: /home/debian/raf-helper-backend
 
     steps:
       - name: Checkout repository
