@@ -28,6 +28,7 @@ jobs:
 
       - name: Copy project to working dir
         run: |
+          mkdir -p $PROJECT_DIR
           rsync -av --delete \
             --exclude '.github' \
             . "$PROJECT_DIR"/
