@@ -63,6 +63,9 @@ services:
       - backend_storage:/app/storage
     env_file:
       - .env
+    networks:
+      ipv6_special_network:
+        ipv6_address: fd00:1234:5678::10
     develop:
       watch:
         - action: rebuild
@@ -74,3 +77,11 @@ volumes:
   postgres_data:
   elastic_data:
   backend_storage:
+
+# supabase requires ipv6 configuration, so this network is required to run the backend container
+networks:
+  ipv6_special_network:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: fd00:1234:5678::/64
