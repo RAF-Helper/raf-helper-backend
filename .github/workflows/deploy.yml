@@ -4,28 +4,15 @@ on:
     branches: [main]
 jobs:
   deploy:
+
     runs-on: self-hosted
+
+    env:
+      PROJECT_DIR: $HOME/raf-helper-backend
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
-      
-      - name: Setup SSH key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          echo "Host deploy_target
-            HostName ${{ secrets.SSH_HOST }}
-            User ${{ secrets.SSH_USER }}
-            Port ${{ secrets.SSH_PORT }}
-            IdentityFile ~/.ssh/deploy_key
-            StrictHostKeyChecking no" > ~/.ssh/config
-      
-      - name: Setup Docker
-        uses: docker/setup-buildx-action@v2
-      
-      - name: Build Docker image
-        run: docker build -t raf-helper-backend .
+        uses: actions/checkout@v6
       
       - name: Create env secrets
         run: |
@@ -38,23 +25,26 @@ jobs:
           echo "HF_TOKEN=${{ secrets.HF_TOKEN }}" >> .env
 
           echo '${{ secrets.FIREBASE_CREDENTIALS }}' > firebase-credentials.json
+
+      - name: Copy project to working dir
+        run: |
+          rsync -av --delete \
+            --exclude '.github' \
+            . "$PROJECT_DIR"/
       
-      - name: Test SSH connection
-        run: ssh deploy_target "echo SSH test successful"
+      - name: Build Docker image
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: docker build -t raf-helper-backend .
       
       - name: Deploy to server
+        working-directory: ${{ env.PROJECT_DIR }}
         run: |
-          ssh deploy_target "docker stop raf-helper-backend || true && docker rm raf-helper-backend || true"
-          
-          docker save raf-helper-backend | ssh deploy_target "docker load"
-          
-          scp .env deploy_target:~/raf-helper-backend-env
-          scp firebase-credentials.json deploy_target:~/raf-helper-backend-firebase-creds
+          docker stop raf-helper-backend || true && docker rm raf-helper-backend || true
 
-          ssh deploy_target "docker run -d --name raf-helper-backend --cpus="1.0" --memory 1g -p ${{ secrets.PORT }}:${{ secrets.PORT }} --restart unless-stopped --env-file ~/raf-helper-backend-env -v ~/raf-helper-backend-firebase-creds:${{ secrets.FIREBASE_CREDENTIALS_PATH }} raf-helper-backend"
+          docker run -d --name raf-helper-backend --cpus="1.0" --memory 1g -p ${{ secrets.PORT }}:${{ secrets.PORT }} --restart unless-stopped --env-file .env -v ~/raf-helper-backend-firebase-creds:${{ secrets.FIREBASE_CREDENTIALS_PATH }} raf-helper-backend
       
       - name: Verify deployment
         run: |
           echo "Waiting for application to start..."
           sleep 10
-          ssh deploy_target "docker ps | grep raf-helper-backend" || echo "Warning: Container may not be running properly"
+          docker ps | grep raf-helper-backend || echo "Warning: Container may not be running properly"
