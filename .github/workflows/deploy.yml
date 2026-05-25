@@ -35,6 +35,7 @@ jobs:
           echo "ELASTICSEARCH_UPDATE_PASSWORD=${{ secrets.ELASTICSEARCH_UPDATE_PASSWORD }}" >> .env
           echo "FIREBASE_CREDENTIALS_PATH=${{ secrets.FIREBASE_CREDENTIALS_PATH }}" >> .env
           echo "DEBUG=false" >> .env
+          echo "HF_TOKEN=${{ secrets.HF_TOKEN }}" >> .env
 
           echo '${{ secrets.FIREBASE_CREDENTIALS }}' > firebase-credentials.json
       
