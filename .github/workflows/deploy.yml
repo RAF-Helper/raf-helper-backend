@@ -36,6 +36,10 @@ jobs:
       - name: Build Docker image
         working-directory: ${{ env.PROJECT_DIR }}
         run: docker build -t raf-helper-backend .
+
+      - name: Stop running containers
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: docker stop raf-helper-backend || true && docker rm raf-helper-backend || true
       
       - name: Network setup
         working-directory: ${{ env.PROJECT_DIR }}
@@ -47,8 +51,6 @@ jobs:
       - name: Deploy to server
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
-          docker stop raf-helper-backend || true && docker rm raf-helper-backend || true
-
           docker run -d --name raf-helper-backend --cpus="1.0" --memory 2g -p ${{ secrets.PORT }}:${{ secrets.PORT }} --network raf-helper-backend-ipv6-special-network --restart unless-stopped --env-file .env -v ~/raf-helper-backend-firebase-creds:${{ secrets.FIREBASE_CREDENTIALS_PATH }} raf-helper-backend
       
       - name: Verify deployment
