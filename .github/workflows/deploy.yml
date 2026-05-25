@@ -32,6 +32,7 @@ jobs:
           mkdir -p $PROJECT_DIR/storage
           rsync -av --delete \
             --exclude '.github' \
+            --exclude 'storage' \
             . "$PROJECT_DIR"/
       
       - name: Build Docker image
