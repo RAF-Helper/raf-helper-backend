@@ -18,8 +18,10 @@ engine = create_async_engine(
     settings.postgres_url,
     echo=settings.debug,
     poolclass=NullPool if settings.debug else None,
+    pool_recycle=300,
+    pool_pre_ping=True,
     connect_args={
-        #"prepared_statement_name_func": lambda: f"__asyncpg_{uuid4()}__",
+        "prepared_statement_name_func": lambda: f"__asyncpg_{uuid4()}__",
         "statement_cache_size": 0 # temp work around for asyncpg+pgbouncer
     },
 )
