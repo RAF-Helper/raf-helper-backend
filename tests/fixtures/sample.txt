@@ -1,0 +1,5 @@
+This is a sample text file for testing.
+It contains multiple lines of text to verify chunking.
+
+This is a new paragraph.
+It should be split if the chunk size is small enough.

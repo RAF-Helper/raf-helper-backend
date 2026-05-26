@@ -1,5 +1,7 @@
 """PostgreSQL repository implementations."""
 
+import uuid
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, insert, delete
 from sqlalchemy.exc import IntegrityError
@@ -86,6 +88,23 @@ class FileMetadataRepository(BaseRepository[FileMetadata]):
             .order_by(FileMetadata.id.desc())
         )
         return result.scalars().all()
+    
+    async def get_uuids(self, ids: int) -> list[uuid.UUID]:
+        """Get uuids of all files with ids."""
+        result = await self.session.execute(
+            select(FileMetadata.document_id)
+            .where(FileMetadata.id.in_(ids))
+            .order_by(FileMetadata.id.desc())
+        )
+        return result.scalars().all()
+    
+    async def get_by_uuid(self, uuid: str) -> list[FileMetadata]:
+        """Get file be uuid."""
+        result = await self.session.execute(
+            select(FileMetadata)
+            .where(FileMetadata.document_id == uuid)
+        )
+        return result.scalars().one_or_none()
 
 
 class ChatContextRepository:

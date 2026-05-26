@@ -34,6 +34,8 @@ class SummarizerAgent(BaseAgent):
             history=inp.history[-10:] if inp.history else [],
             temperature=0.7,
             use_tools=True,
+            file_ids=inp.file_ids,
+            use_web_search=inp.use_web_search,
         )
 
         return AgentOutput(

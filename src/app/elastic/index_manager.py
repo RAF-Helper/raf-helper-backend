@@ -96,7 +96,7 @@ EVENTS_MAPPING = {
 CONTEXT_MATERIALS_MAPPING = {
     "mappings": {
         "properties": {
-            "document_id": {"type": "integer"},
+            "document_id": {"type": "keyword"},  # UUID as string
             "chunk_index": {"type": "integer"},
             "chunk_text": {"type": "text", "analyzer": "standard"},
             "chunk_vector": {
@@ -105,6 +105,32 @@ CONTEXT_MATERIALS_MAPPING = {
                 "index": True,
                 "similarity": "cosine",
             },
+            # Reference level 1 (e.g., chapter/slide number)
+            "chunk_reference_level_1": {"type": "keyword"},
+            "chunk_reference_level_1_vector": {
+                "type": "dense_vector",
+                "dims": VECTOR_DIMS,
+                "index": True,
+                "similarity": "cosine",
+            },
+            # Reference level 2 (e.g., section title)
+            "chunk_reference_level_2": {"type": "keyword"},
+            "chunk_reference_level_2_vector": {
+                "type": "dense_vector",
+                "dims": VECTOR_DIMS,
+                "index": True,
+                "similarity": "cosine",
+            },
+            # Reference level 3 (e.g., subsection title)
+            "chunk_reference_level_3": {"type": "keyword"},
+            "chunk_reference_level_3_vector": {
+                "type": "dense_vector",
+                "dims": VECTOR_DIMS,
+                "index": True,
+                "similarity": "cosine",
+            },
+            # Metadata about the chunk
+            "chunk_reference_metadata": {"type": "object", "enabled": True},
             "created_at": {"type": "date"},
         }
     }

@@ -31,6 +31,8 @@ dependencies = [
     "sentence-transformers>=3.4.0",
     "chainlit>=2.5.0",
     "streamlit>=1.40.0",
+    "tavily>=1.1.0",
+    "pdfplumber>=0.11.9",
 ]
 
 [dependency-groups]
@@ -45,3 +47,6 @@ package = true
 
 [tool.uv.sources]
 ru-core-news-md = { url = "https://github.com/explosion/spacy-models/releases/download/ru_core_news_md-3.8.0/ru_core_news_md-3.8.0-py3-none-any.whl" }
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

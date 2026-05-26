@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...db.session import get_session
 from ...services.chat_service import ChatService, ChatNotFoundError
 from ...services.user_service import UserService
-from ...services.file_service import FileService
+from ...services.document_service import DocumentService
 from ..auth.firebase import verify_firebase_token
 from ...schemas.chat import ChatCreate, ChatRead, ChatUpdate
 from ...schemas.message import MessageRead
@@ -192,7 +192,7 @@ async def add_context_file(
     chat = await ChatService(session).get_chat(chat_id, user_id)
     if not chat:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found.")
-    linked = await FileService(session).link_to_chat(file_id, chat_id, user_id)
+    linked = await DocumentService(session).link_to_chat(file_id, chat_id, user_id)
     if not linked:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found.")
 
@@ -208,4 +208,4 @@ async def remove_context_file(
     chat = await ChatService(session).get_chat(chat_id, user_id)
     if not chat:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found.")
-    await FileService(session).unlink_from_chat(file_id, chat_id)
+    await DocumentService(session).unlink_from_chat(file_id, chat_id)

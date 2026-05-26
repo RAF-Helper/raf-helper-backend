@@ -37,6 +37,8 @@ class PresentationAgent(BaseAgent):
             history=inp.history,
             temperature=0.7,
             use_tools=True,
+            file_ids=inp.file_ids,
+            use_web_search=inp.use_web_search,
         )
 
         return AgentOutput(

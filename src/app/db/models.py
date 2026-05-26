@@ -1,9 +1,11 @@
 """Database models."""
 
+import uuid
 from sqlalchemy import (
     Column, BigInteger, String, Text, ForeignKey, MetaData,
     DateTime, Boolean, Integer,
 )
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.sql import func
 
@@ -67,6 +69,10 @@ class FileMetadata(Base):
     is_indexed = Column(Boolean, nullable=False, default=False)
     chunk_count = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    # New fields for document parsing
+    document_id = Column(UUID(as_uuid=True), default=uuid.uuid4, nullable=False, unique=True, index=True)
+    name = Column(String(1024), nullable=True)  # extracted document title
+    format = Column(String(32), nullable=False)  # pdf, docx, pptx, txt
 
     user = relationship("User", back_populates="files")
     chats = relationship(

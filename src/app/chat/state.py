@@ -15,7 +15,7 @@ class AgentInput:
     chat_id: int
     user_id: int
     history: list[dict[str, str]]          # [{"role": ..., "content": ...}]
-    file_ids: list[int]                    # PG file IDs in chat context
+    file_ids: list[str]                    # Document UUIDs in chat context
     use_web_search: bool
     summarization_mode: SummarizationMode
     forced_agent: Optional[AgentType]
