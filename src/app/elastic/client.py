@@ -16,6 +16,8 @@ class ElasticsearchClient:
         if cls._instance is None:
             cls._instance = AsyncElasticsearch(
                 hosts=[settings.elasticsearch_url],
+                request_timeout=120,
+                retry_on_timeout=True,
                 # Add authentication if needed
                 # basic_auth=("username", "password") if settings.elasticsearch_username else None,
             )
