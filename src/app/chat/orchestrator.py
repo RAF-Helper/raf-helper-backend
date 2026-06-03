@@ -12,6 +12,7 @@ from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.chat.services import ChatServices
 from app.schemas.agent import AgentType, SummarizationMode
 from app.chat.state import AgentInput, AgentOutput
 from app.chat.agents.support_agent import SupportAgent
@@ -30,9 +31,10 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 class Orchestrator:
-    def __init__(self, services):
+    def __init__(self, services: ChatServices):
         self._services = services
-        self._llm = services.llm
+        self._llm = services.agentic_llm
+        self.router_llm = services.router_llm
         self._pii = services.pii
         self._embedder = services.embedder
 
@@ -90,7 +92,7 @@ class Orchestrator:
         from app.chat.agents.router_agent import RouterAgent
         from app.chat.state import AgentInput
 
-        router = RouterAgent(self._llm)
+        router = RouterAgent(self.router_llm)
         router_inp = AgentInput(
             message="",
             masked_message=query,
