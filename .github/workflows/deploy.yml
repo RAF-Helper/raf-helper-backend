@@ -34,6 +34,7 @@ jobs:
           rsync -av --delete \
             --exclude '.github' \
             --exclude 'storage' \
+            --exclude 'logs' \
             . "$PROJECT_DIR"/
       
       - name: Build Docker image
