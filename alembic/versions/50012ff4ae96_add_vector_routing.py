@@ -39,7 +39,7 @@ def upgrade() -> None:
         CREATE TABLE vector.intents (
             id SERIAL PRIMARY KEY,
             text TEXT NOT NULL,
-            text_embedding vector(1024),
+            text_embedding vector.vector(1024),
             route_id INT REFERENCES vector.routes(id) ON DELETE CASCADE
         )
     """)
