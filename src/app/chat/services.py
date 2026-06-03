@@ -14,7 +14,10 @@ class ChatServices:
         if cls._instance is None:
             cls._instance = super(ChatServices, cls).__new__(cls)
             logger.info("Initializing shared chat services...")
-            cls._instance.llm = OpenRouterClient()
+            cls._instance.llm = OpenRouterClient(
+                model="google/gemma-4-26b-a4b-it:free",
+                fallback_models=["poolside/laguna-xs.2:free", "google/gemma-4-31b-it:free"]
+            )
             cls._instance.pii = PIIMasker()
             cls._instance.embedder = get_embedding_service()
         return cls._instance
