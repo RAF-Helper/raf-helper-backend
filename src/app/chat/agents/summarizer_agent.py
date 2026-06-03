@@ -46,6 +46,7 @@ class SummarizerAgent(BaseAgent):
             use_tools=True,
             file_ids=inp.file_ids,
             use_web_search=inp.use_web_search,
+            chat_id=inp.chat_id,
         )
 
         return AgentOutput(
