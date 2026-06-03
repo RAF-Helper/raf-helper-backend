@@ -7,20 +7,15 @@ from app.schemas.agent import AgentType
 from app.chat.state import AgentInput, AgentOutput
 from app.tools.search_tools import get_materials_fragments_def
 
+logger = logging.getLogger(__name__)
 
 class PresentationAgent(BaseAgent):
     """
     Generates PowerPoint presentations from context materials.
-
-    Uses subagents:
-    1. SlidePlanner creates slide outline
-    2. Slider creates each slide iteratively using previous summaries
-    3. SlideSummarizer summarizes previous slides for context
-    4. Export to .pptx using python-pptx
     """
 
     agent_type = AgentType.presentation
-    tools = [get_materials_fragments_def]  # Main tool for presentation content
+    tools = [get_materials_fragments_def]
 
     def __init__(self, llm_client):
         super().__init__(llm_client)
@@ -29,7 +24,6 @@ class PresentationAgent(BaseAgent):
         self.summarizer = SlideSummarizerAgent(llm_client)
 
     async def run(self, inp: AgentInput) -> AgentOutput:
-        """Generate PowerPoint presentation using material retrieval tool."""
         template = self._load_prompt("presentation_agent")
         system_prompt = template.format(query=inp.masked_message)
 
@@ -54,36 +48,69 @@ class SlidePlannerAgent(BaseAgent):
     """Plans slide structure."""
 
     agent_type = AgentType.presentation
-    tools = []  # Will use get_materials_fragments when fully implemented
-
-    def __init__(self, llm_client):
-        super().__init__(llm_client)
+    prompt_name = "presentation_planner"
 
     async def run(self, inp: AgentInput) -> AgentOutput:
-        raise NotImplementedError("Implement SlidePlannerAgent.run()")
+        system_prompt = self._load_prompt(self.prompt_name)
+
+        response = await self._call_llm(
+            system_prompt=system_prompt,
+            user_prompt=inp.masked_message,
+            temperature=0.3
+        )
+
+        try:
+            import json
+            content = response.strip()
+            if "```json" in content:
+                content = content.split("```json")[1].split("```")[0].strip()
+            elif "```" in content:
+                content = content.split("```")[1].split("```")[0].strip()
+
+            outline = json.loads(content)
+            if isinstance(outline, list):
+                return AgentOutput(content=json.dumps(outline), agent_used=self.agent_type, masked_query=inp.masked_message)
+        except Exception as e:
+            logger.error(f"Error parsing slide planner response: {e}")
+
+        return AgentOutput(content="[\"Introduction\", \"Core Concept\", \"Conclusion\"]", agent_used=self.agent_type, masked_query=inp.masked_message)
 
 
 class SliderAgent(BaseAgent):
     """Creates individual slides."""
 
     agent_type = AgentType.presentation
-    tools = [get_materials_fragments_def]  # Will need material retrieval
-
-    def __init__(self, llm_client):
-        super().__init__(llm_client)
+    tools = [get_materials_fragments_def]
+    prompt_name = "presentation_slider"
 
     async def run(self, inp: AgentInput) -> AgentOutput:
-        raise NotImplementedError("Implement SliderAgent.run()")
+        system_prompt = self._load_prompt(self.prompt_name)
+
+        response = await self._call_llm(
+            system_prompt=system_prompt,
+            user_prompt=inp.masked_message,
+            temperature=0.7,
+            use_tools=True,
+            file_ids=inp.file_ids,
+            use_web_search=inp.use_web_search,
+        )
+
+        return AgentOutput(content=response, agent_used=self.agent_type, masked_query=inp.masked_message)
 
 
 class SlideSummarizerAgent(BaseAgent):
     """Summarizes previous slides for context."""
 
     agent_type = AgentType.presentation
-    tools = []  # Summarization doesn't need retrieval
-
-    def __init__(self, llm_client):
-        super().__init__(llm_client)
+    prompt_name = "presentation_summarizer"
 
     async def run(self, inp: AgentInput) -> AgentOutput:
-        raise NotImplementedError("Implement SlideSummarizerAgent.run()")
+        system_prompt = self._load_prompt(self.prompt_name)
+
+        response = await self._call_llm(
+            system_prompt=system_prompt,
+            user_prompt=inp.masked_message,
+            temperature=0.3
+        )
+
+        return AgentOutput(content=response, agent_used=self.agent_type, masked_query=inp.masked_message)
