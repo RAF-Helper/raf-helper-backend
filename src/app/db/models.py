@@ -112,6 +112,6 @@ class Intent(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     route_id = Column(Integer, ForeignKey("vector.routes.id", ondelete="CASCADE"), nullable=False, index=True)
     text = Column(Text, nullable=False)
-    text_embedding = Column(Vector(1024))
+    text_embedding = Column(Vector(1024).with_variant(Vector(1024), "postgresql"))
 
     route = relationship("Route", back_populates="intents")

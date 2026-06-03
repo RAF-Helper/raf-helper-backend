@@ -30,25 +30,32 @@ class RoutingRepository:
         Perform cosine similarity search for the most similar intents.
         Returns a list of dicts with route_id, score, and text.
         """
-        # Explicitly cast the query_vector to the Vector type to avoid 'operator does not exist' error
-        stmt = (
-            select(
-                Intent.route_id,
-                Intent.text,
-                (1 - Intent.text_embedding.cosine_distance(cast(query_vector, Vector(1024)))).label("score")
-            )
-            .order_by(Intent.text_embedding.cosine_distance(cast(query_vector, Vector(1024))))
-            .limit(k)
-        )
+        # Use the fully qualified type name vector.vector to match Supabase schema
+        # Since pgvector.sqlalchemy.Vector might map to 'vector', we use a raw cast if needed
+        # or ensure the cast uses the correct schema.
+        from sqlalchemy import text as sa_text
 
-        result = await self._session.execute(stmt)
+        # We use raw SQL for the distance calculation to ensure the type cast '::vector'
+        # works correctly with the schema.
+        query = sa_text("""
+            SELECT route_id, text, 1 - (text_embedding <=> :vector::vector) as score
+            FROM vector.intents
+            ORDER BY text_embedding <=> :vector::vector
+            LIMIT :k
+        """)
+
+        result = await self._session.execute(query, {
+            "vector": str(query_vector),
+            "k": k
+        })
+
         rows = result.all()
 
         return [
             {
-                "route_id": row.route_id,
-                "score": row.score,
-                "text": row.text
+                "route_id": row[0],
+                "score": row[2],
+                "text": row[1]
             }
             for row in rows
         ]
