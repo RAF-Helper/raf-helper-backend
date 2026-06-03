@@ -52,6 +52,7 @@ class BaseAgent(ABC):
         file_ids: list[int] | None = None,
         use_web_search: bool = False,
         session: Any = None,
+        chat_id: int | None = None,
         **kwargs: Any,
     ) -> str:
         """
@@ -170,7 +171,7 @@ class BaseAgent(ABC):
                         tool_args["use_web_search"] = use_web_search
                     elif tool_name == "list_context_files":
                         # Inject chat_id from kwargs (must be passed to _call_llm)
-                        tool_args["chat_id"] = kwargs.get("chat_id")
+                        tool_args["chat_id"] = chat_id
 
 
                     try:
