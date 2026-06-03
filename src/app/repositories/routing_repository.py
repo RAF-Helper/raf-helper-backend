@@ -30,34 +30,35 @@ class RoutingRepository:
         Perform cosine similarity search for the most similar intents.
         Returns a list of dicts with route_id, score, and text.
         """
-        # We use the SQLAlchemy expression API instead of raw text to avoid placeholder conflicts.
-        # pgvector.sqlalchemy's cosine_distance handles the operator correctly.
-        # To ensure the cast to vector.vector happens correctly in Supabase:
+        # To fix "operator does not exist: vector.vector <=> unknown" in Supabase,
+        # we must cast the parameter to the explicit type 'vector.vector'.
+        # We use a raw SQL query but avoid the :: syntax which crashes asyncpg.
+        # instead we use CAST(:vector AS vector.vector)
 
-        stmt = (
-            select(
-                Intent.route_id,
-                Intent.text,
-                (1 - Intent.text_embedding.cosine_distance(query_vector)).label("score")
-            )
-            .order_by(Intent.text_embedding.cosine_distance(query_vector))
-            .limit(k)
-        )
+        query = text("""
+            SELECT route_id, text, 1 - (text_embedding <=> CAST(:vector AS vector.vector)) as score
+            FROM vector.intents
+            ORDER BY text_embedding <=> CAST(:vector AS vector.vector)
+            LIMIT :k
+        """)
 
         try:
-            result = await self._session.execute(stmt)
+            # Pass the vector as a string to avoid asyncpg array issues
+            # and let the CAST handle the conversion.
+            result = await self._session.execute(query, {
+                "vector": str(query_vector),
+                "k": k
+            })
             rows = result.all()
 
             return [
                 {
-                    "route_id": row.route_id,
-                    "score": row.score,
-                    "text": row.text
+                    "route_id": row[0],
+                    "score": row[2],
+                    "text": row[1]
                 }
                 for row in rows
             ]
         except Exception as e:
             logger.error(f"Error searching intents: {e}")
-            # If the above fails, we can try a raw query with a different casting method
-            # as a fallback, but the SQLAlchemy expression is the correct way.
             raise
