@@ -20,15 +20,12 @@ def _get_repo(es: AsyncElasticsearch = Depends(get_elasticsearch_client)) -> Ela
     return ElasticsearchRepository(es)
 
 
-def _get_embedder():
-    return get_embedding_service()
-
-
 @router.post("/", response_model=EventRead, status_code=status.HTTP_201_CREATED)
 async def create_event(
     body: EventCreate,
+    firebase_uid: str = Depends(verify_firebase_token),
     repo: ElasticsearchRepository = Depends(_get_repo),
-    embedder: EmbeddingService = Depends(_get_embedder),
+    embedder: EmbeddingService = Depends(get_embedding_service),
 ) -> EventRead:
     """Add a new event to the index.
 
@@ -58,6 +55,7 @@ async def search_events(
     date_to: Optional[datetime] = Query(default=None),
     bonus_amount: Optional[int] = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
+    firebase_uid: str = Depends(verify_firebase_token),
     repo: ElasticsearchRepository = Depends(_get_repo),
 ) -> list[EventSearchResult]:
     """Full-text (BM25 + optional kNN) events search with optional date/bonus filters.
@@ -72,6 +70,7 @@ async def search_events(
 @router.get("/{doc_id}", response_model=EventRead)
 async def get_event(
     doc_id: str,
+    firebase_uid: str = Depends(verify_firebase_token),
     repo: ElasticsearchRepository = Depends(_get_repo),
 ) -> EventRead:
     doc = await repo.get_event(doc_id)
@@ -84,8 +83,9 @@ async def get_event(
 async def update_event(
     doc_id: str,
     body: EventUpdate,
+    firebase_uid: str = Depends(verify_firebase_token),
     repo: ElasticsearchRepository = Depends(_get_repo),
-    embedder: EmbeddingService = Depends(_get_embedder),
+    embedder: EmbeddingService = Depends(get_embedding_service),
 ) -> EventRead:
     partial = body.model_dump(exclude_none=True)
     if not partial:
@@ -113,6 +113,7 @@ async def update_event(
 @router.delete("/{doc_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_event(
     doc_id: str,
+    firebase_uid: str = Depends(verify_firebase_token),
     repo: ElasticsearchRepository = Depends(_get_repo),
 ) -> None:
     deleted = await repo.delete_event(doc_id)
