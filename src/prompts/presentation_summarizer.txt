@@ -1,0 +1,1 @@
+Summarize the previous slides concisely to maintain flow and avoid repetition in the next slide.
