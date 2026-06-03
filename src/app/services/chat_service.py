@@ -79,7 +79,7 @@ class ChatService:
     async def get_context_file_ids(self, chat_id: int) -> list[str]:
         """Get document IDs for files linked to a chat."""
         files = await self.ctx_repo.get_files_for_chat(chat_id)
-        return [str(f.id) for f in files]
+        return [int(f.id) for f in files]
 
     async def get_history_as_messages(
         self, chat_id: int, user_id: int, limit: int = 40

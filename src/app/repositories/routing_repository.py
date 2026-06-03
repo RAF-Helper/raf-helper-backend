@@ -2,9 +2,10 @@
 
 import logging
 from typing import Any, Optional
-from sqlalchemy import text
+from sqlalchemy import select, insert, text, bindparam
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import Route, Intent
+from pgvector.sqlalchemy import Vector
 
 logger = logging.getLogger(__name__)
 
@@ -30,21 +31,21 @@ class RoutingRepository:
         Returns a list of dicts with route_id, score, and text.
         """
         try:
-            # CRITICAL: Set search_path to include 'vector' schema.
-            # This ensures the <=> operator is found by PostgreSQL.
+            # Ensure search_path includes 'vector' schema for operators
             await self._session.execute(text("SET search_path TO public, vector"))
 
-            # Now we can use the operator without explicit schema qualification
-            # on the operator itself, as it's now in the search path.
+            # We use a raw SQL query but use bindparam to explicitly define the type as Vector.
+            # This prevents the 'operator does not exist' and 'syntax error' issues
+            # because asyncpg will now correctly encode the list as a pgvector type.
             query = text("""
-                SELECT route_id, text, 1 - (text_embedding <=> :vector::vector) as score
+                SELECT route_id, text, 1 - (text_embedding <=> :vector) as score
                 FROM vector.intents
-                ORDER BY text_embedding <=> :vector::vector
+                ORDER BY text_embedding <=> :vector
                 LIMIT :k
-            """)
+            """).bindparams(bindparam("vector", type_=Vector(1024)))
 
             result = await self._session.execute(query, {
-                "vector": str(query_vector),
+                "vector": query_vector,
                 "k": k
             })
             rows = result.all()
