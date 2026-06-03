@@ -30,6 +30,7 @@ jobs:
         run: |
           mkdir -p $PROJECT_DIR
           mkdir -p $PROJECT_DIR/storage
+          mkdir -p $PROJECT_DIR/logs
           rsync -av --delete \
             --exclude '.github' \
             --exclude 'storage' \
@@ -53,7 +54,15 @@ jobs:
       - name: Deploy to server
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
-          docker run -d --name raf-helper-backend --cpus="1.0" -p ${{ secrets.PORT }}:${{ secrets.PORT }} --network raf-helper-backend-ipv6-special-network --restart unless-stopped --env-file .env -v ${{ env.PROJECT_DIR }}/firebase-credentials.json:${{ secrets.FIREBASE_CREDENTIALS_PATH }} -v ${{ env.PROJECT_DIR }}/storage:/app/storage raf-helper-backend
+          docker run -d --name raf-helper-backend \
+            --cpus="1.0" \
+            -p ${{ secrets.PORT }}:${{ secrets.PORT }} \
+            --network raf-helper-backend-ipv6-special-network \
+            --restart unless-stopped --env-file .env \
+            -v ${{ env.PROJECT_DIR }}/firebase-credentials.json:${{ secrets.FIREBASE_CREDENTIALS_PATH }} \
+            -v ${{ env.PROJECT_DIR }}/storage:/app/storage \
+            -v ${{ env.PROJECT_DIR }}/logs:/app/logs \
+            raf-helper-backend
       
       - name: Verify deployment
         run: |
