@@ -174,8 +174,9 @@ class BaseAgent(ABC):
                         if not func:
                             result = f"Error: tool '{tool_name}' not found"
                         else:
-                            # Execute the async tool function
+                            logger.info(f"Executing tool [{tool_name}] with args: {tool_args}")
                             result = await func(**tool_args)
+                            logger.info(f"Tool [{tool_name}] returned: {str(result)[:500]}...")
                         result_str = str(result)
                     except Exception as e:
                         logger.error(f"Error executing tool {tool_name}: {e}", exc_info=True)

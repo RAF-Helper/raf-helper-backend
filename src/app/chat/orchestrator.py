@@ -75,10 +75,10 @@ class Orchestrator:
 
                 # Decision Engine: Threshold and Margin check
                 if s1 >= settings.routing_threshold and (s1 - s2) >= settings.routing_margin:
-                    logger.info(f"Semantic route found: {r1} (score: {s1:.4f}, margin: {s1-s2:.4f})")
+                    logger.info(f"Semantic route found: {r1} (score: {s1:.4f}, margin: {s1-s2:.4f}, threshold: {settings.routing_threshold}, margin_req: {settings.routing_margin})")
                     return AgentType(r1)
 
-                logger.info(f"Semantic routing ambiguous or low confidence (s1: {s1:.4f}, s2: {s2:.4f}). Falling back to RouterAgent.")
+                logger.info(f"Semantic routing ambiguous or low confidence (s1: {s1:.4f}, s2: {s2:.4f}, delta: {s1-s2:.4f}). Falling back to RouterAgent.")
 
         except Exception as e:
             logger.error(f"Error during semantic routing: {e}", exc_info=True)
