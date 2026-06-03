@@ -5,12 +5,12 @@ import logging
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...db.session import get_session
-from ...services.document_service import DocumentService, UnsupportedFileTypeError
-from ...schemas.document import DocumentSearchRequest, DocumentChunk
-from ...services.user_service import UserService
-from ..auth.firebase import verify_firebase_token
-from ...schemas.file import FileRead, FileUploadResponse
+from app.db.session import get_session
+from app.services.document_service import DocumentService, UnsupportedFileTypeError
+from app.schemas.document import DocumentSearchRequest, DocumentChunk
+from app.services.user_service import UserService
+from app.api.auth.firebase import verify_firebase_token
+from app.schemas.file import FileRead, FileUploadResponse
 
 router = APIRouter(prefix="/files", tags=["files"])
 

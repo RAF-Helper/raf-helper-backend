@@ -4,8 +4,8 @@ import re
 from pathlib import Path
 from uuid import uuid4
 
-from .base import BaseParser
-from ..schemas.document import Document, DocumentChunk, DocumentFormat
+from app.parsers.base import BaseParser
+from app.schemas.document import Document, DocumentChunk, DocumentFormat
 
 # Regex to detect markdown headings: # H1, ## H2, ### H3
 RE_MD_HEADING = re.compile(r'^(#{1,3})\s+(.*)')

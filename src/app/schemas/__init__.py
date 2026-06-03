@@ -1,12 +1,12 @@
 """Pydantic schemas for request/response validation."""
 
-from .user import UserRead, UserSync
-from .chat import ChatCreate, ChatRead, ChatUpdate
-from .message import MessageRead, MessageRole
-from .file import FileRead, FileUploadResponse
-from .staff import StaffCreate, StaffRead, StaffUpdate, StaffSearchResult
-from .events import EventCreate, EventRead, EventUpdate, EventSearchResult
-from .agent import AgentType, SummarizationMode, ChatMessageRequest, AgentChatResponse
+from app.schemas.user import UserRead, UserSync
+from app.schemas.chat import ChatCreate, ChatRead, ChatUpdate
+from app.schemas.message import MessageRead, MessageRole
+from app.schemas.file import FileRead, FileUploadResponse
+from app.schemas.staff import StaffCreate, StaffRead, StaffUpdate, StaffSearchResult
+from app.schemas.events import EventCreate, EventRead, EventUpdate, EventSearchResult
+from app.schemas.agent import AgentType, SummarizationMode, ChatMessageRequest, AgentChatResponse
 
 __all__ = [
     "UserRead", "UserSync",

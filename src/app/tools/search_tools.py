@@ -4,11 +4,11 @@ import logging
 from typing import Optional
 from datetime import datetime
 
-from ..repositories.elasticsearch_repository import ElasticsearchRepository
-from ..services.embedding_service import EmbeddingService
-from ..services.tavily_service import get_tavily_service
-from ..services.document_service import DocumentService
-from ..db.session import AsyncSessionLocal
+from app.repositories.elasticsearch_repository import ElasticsearchRepository
+from app.services.embedding_service import EmbeddingService
+from app.services.tavily_service import get_tavily_service
+from app.services.document_service import DocumentService
+from app.db.session import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
 

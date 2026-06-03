@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from .config import settings
+from app.config import settings
 
 
 def setup_logging(

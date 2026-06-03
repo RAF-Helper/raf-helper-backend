@@ -3,8 +3,8 @@
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db.models import Chat, ChatMessage
-from ..repositories.postgres_repository import (
+from app.db.models import Chat, ChatMessage
+from app.repositories.postgres_repository import (
     ChatRepository, ChatMessageRepository, ChatContextRepository
 )
 

@@ -1,9 +1,9 @@
 """Question answering agent (RAG)."""
 
-from .base import BaseAgent
-from ..state import AgentInput, AgentOutput
-from ...schemas.agent import AgentType
-from ...tools.search_tools import get_materials_fragments_def
+from app.chat.agents.base import BaseAgent
+from app.chat.state import AgentInput, AgentOutput
+from app.schemas.agent import AgentType
+from app.tools.search_tools import get_materials_fragments_def
 
 
 class QAAgent(BaseAgent):

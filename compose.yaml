@@ -23,7 +23,7 @@ services:
       start_period: 30s
 
   postgresql:
-    image: postgres:17-alpine3.22
+    image: pgvector/pgvector:pg17
     restart: always
     environment:
         POSTGRES_DB: ${POSTGRES_DATABASE}
@@ -46,6 +46,7 @@ services:
     build:
       context: .
       dockerfile: dockerfile
+      network: host
     environment:
         POSTGRES_HOST: "postgresql"
         DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@postgresql/${POSTGRES_DATABASE}
@@ -53,6 +54,7 @@ services:
         STORAGE_PATH: /app/storage
         OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
         TAVILY_API_KEY: ${TAVILY_API_KEY}
+        HF_TOKEN: ${HF_TOKEN}
         DEBUG: ${DEBUG}
     depends_on:
       postgresql:
