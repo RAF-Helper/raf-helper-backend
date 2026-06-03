@@ -31,7 +31,60 @@ def _get_embedder() -> EmbeddingService:
     return _embedder
 
 
-# ============ Tool Functions ============
+async def list_context_files(
+    chat_id: Optional[int] = None,
+) -> str:
+    """
+    List all files currently present in the chat context.
+    Returns a list of files with their IDs and names.
+    """
+    if chat_id is None:
+        return "Error: Chat ID not provided. Cannot list context files."
+
+    try:
+        async with AsyncSessionLocal() as session:
+            doc_service = DocumentService(session)
+            file_ids = await doc_service.get_chat_file_ids(chat_id)
+
+            if not file_ids:
+                return "No files found in the current chat context."
+
+            # Fetch metadata for these files
+            # Use file_repo directly via doc_service
+            files = await doc_service.file_repo.get_by_ids(file_ids)
+
+            lines = ["Files in the current chat context:"]
+            for f in files:
+                lines.append(f"- ID: {f.id}, Name: {f.original_name}")
+
+            return "\n".join(lines)
+    except Exception as e:
+        logger.error(f"Error listing context files for chat {chat_id}: {e}", exc_info=True)
+        return "Error retrieving context files."
+
+
+async def get_file_content(
+    file_id: int,
+) -> str:
+    """
+    Retrieve the full text content of a specific file using its file ID.
+    """
+    try:
+        async with AsyncSessionLocal() as session:
+            doc_service = DocumentService(session)
+            # Resolve file_id to document_id (UUID)
+            file_record = await doc_service.file_repo.get(file_id)
+            if not file_record:
+                return f"Error: File with ID {file_id} not found."
+
+            content = await doc_service.get_full_document_text(file_record.document_id)
+            if not content:
+                return f"Error: Could not retrieve content for file {file_record.original_name} (ID: {file_id})."
+
+            return f"Content of {file_record.original_name} (ID: {file_id}):\n\n{content}"
+    except Exception as e:
+        logger.error(f"Error getting content for file {file_id}: {e}", exc_info=True)
+        return f"Error retrieving file content: {str(e)}"
 
 async def get_staff_documents(
     query: str,
@@ -199,6 +252,31 @@ async def get_materials_fragments(
 
 # ============ OpenAI Tool Definitions ============
 
+list_context_files_def = {
+    "name": "list_context_files",
+    "description": "List all files currently present in the chat context. Returns a list of files with their IDs and names.",
+    "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+    }
+}
+
+get_file_content_def = {
+    "name": "get_file_content",
+    "description": "Retrieve the full text content of a specific file using its file ID.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "file_id": {
+                "type": "integer",
+                "description": "The unique integer ID of the file"
+            }
+        },
+        "required": ["file_id"]
+    }
+}
+
 get_staff_documents_def = {
     "name": "get_staff_documents",
     "description": "Search for university staff members by name, position, department, or competences. Returns detailed staff information including name, position, department, and room number.",
@@ -293,12 +371,16 @@ get_materials_fragments_def = {
 
 # Export all tools and their definitions
 ALL_TOOLS = [
+    list_context_files_def,
+    get_file_content_def,
     get_staff_documents_def,
     get_events_documents_def,
     get_materials_fragments_def,
 ]
 
 TOOL_FUNCTIONS = {
+    "list_context_files": list_context_files,
+    "get_file_content": get_file_content,
     "get_staff_documents": get_staff_documents,
     "get_events_documents": get_events_documents,
     "get_materials_fragments": get_materials_fragments,

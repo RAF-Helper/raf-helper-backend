@@ -3,7 +3,12 @@
 from app.chat.agents.base import BaseAgent
 from app.schemas.agent import AgentType
 from app.chat.state import AgentInput, AgentOutput
-from app.tools.search_tools import get_materials_fragments_def
+from app.tools.search_tools import (
+    get_materials_fragments_def,
+    list_context_files_def,
+    get_file_content_def,
+)
+
 
 
 class SummarizerAgent(BaseAgent):
@@ -11,7 +16,12 @@ class SummarizerAgent(BaseAgent):
 
     agent_type = AgentType.summarizer
     prompt_name = "summarizer_agent"
-    tools = [get_materials_fragments_def]
+    tools = [
+        get_materials_fragments_def,
+        list_context_files_def,
+        get_file_content_def,
+    ]
+
 
     def __init__(self, llm_client):
         super().__init__(llm_client)

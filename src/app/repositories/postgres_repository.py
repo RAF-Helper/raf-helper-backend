@@ -106,6 +106,13 @@ class FileMetadataRepository(BaseRepository[FileMetadata]):
         )
         return result.scalars().one_or_none()
 
+    async def get_by_ids(self, ids: list[int]) -> list[FileMetadata]:
+        """Get multiple files by their IDs."""
+        result = await self.session.execute(
+            select(FileMetadata).where(FileMetadata.id.in_(ids))
+        )
+        return result.scalars().all()
+
 
 class ChatContextRepository:
     """Repository for chat_context join table (not using BaseRepository)."""

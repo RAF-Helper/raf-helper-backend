@@ -168,6 +168,10 @@ class BaseAgent(ABC):
                             tool_args["document_ids"] = file_ids
                         # Inject use_web_search flag
                         tool_args["use_web_search"] = use_web_search
+                    elif tool_name == "list_context_files":
+                        # Inject chat_id from kwargs (must be passed to _call_llm)
+                        tool_args["chat_id"] = kwargs.get("chat_id")
+
 
                     try:
                         func = TOOL_FUNCTIONS.get(tool_name)
