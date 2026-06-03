@@ -6,8 +6,8 @@ from datetime import datetime, timezone
 from elasticsearch import AsyncElasticsearch, NotFoundError
 from elasticsearch.helpers import async_bulk
 
-from ..elastic.client import ElasticsearchClient
-from ..elastic.index_manager import STAFF_INDEX, EVENTS_INDEX, CONTEXT_MATERIALS_INDEX
+from app.elastic.client import ElasticsearchClient
+from app.elastic.index_manager import STAFF_INDEX, EVENTS_INDEX, CONTEXT_MATERIALS_INDEX
 
 
 class ElasticsearchRepository:

@@ -1,9 +1,9 @@
 """Summarizer agent implementation."""
 
-from .base import BaseAgent
-from ...schemas.agent import AgentType
-from ..state import AgentInput, AgentOutput
-from ...tools.search_tools import get_materials_fragments_def
+from app.chat.agents.base import BaseAgent
+from app.schemas.agent import AgentType
+from app.chat.state import AgentInput, AgentOutput
+from app.tools.search_tools import get_materials_fragments_def
 
 
 class SummarizerAgent(BaseAgent):

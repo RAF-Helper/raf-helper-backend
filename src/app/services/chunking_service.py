@@ -2,8 +2,8 @@
 
 from typing import Optional
 from uuid import uuid4
-from ..config import settings
-from ..schemas.document import Document, DocumentChunk, DocumentFormat
+from app.config import settings
+from app.schemas.document import Document, DocumentChunk, DocumentFormat
 
 class TextChunker:
     """Internal recursive text chunker logic."""

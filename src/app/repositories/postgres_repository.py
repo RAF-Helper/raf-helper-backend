@@ -6,8 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, insert, delete
 from sqlalchemy.exc import IntegrityError
 
-from .base import BaseRepository
-from ..db.models import User, Chat, ChatMessage, FileMetadata, ChatContext
+from app.repositories.base import BaseRepository
+from app.db.models import User, Chat, ChatMessage, FileMetadata, ChatContext
 
 
 class UserRepository(BaseRepository[User]):

@@ -3,8 +3,12 @@
 import uuid
 from sqlalchemy import (
     Column, BigInteger, String, Text, ForeignKey, MetaData,
-    DateTime, Boolean, Integer,
+    DateTime, Boolean, Integer
 )
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.sql import func
+from pgvector.sqlalchemy import Vector
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.sql import func
@@ -89,3 +93,25 @@ class ChatContext(Base):
 
     chat_id = Column(BigInteger, ForeignKey("chats.id", ondelete="CASCADE"), primary_key=True)
     file_id = Column(BigInteger, ForeignKey("file_metadata.id", ondelete="CASCADE"), primary_key=True)
+
+
+class Route(Base):
+    __tablename__ = "routes"
+    __table_args__ = {"schema": "vector"}
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(16), nullable=False, unique=True)
+
+    intents = relationship("Intent", back_populates="route", cascade="all, delete-orphan")
+
+
+class Intent(Base):
+    __tablename__ = "intents"
+    __table_args__ = {"schema": "vector"}
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    route_id = Column(Integer, ForeignKey("vector.routes.id", ondelete="CASCADE"), nullable=False, index=True)
+    text = Column(Text, nullable=False)
+    text_embedding = Column(Vector(1024))
+
+    route = relationship("Route", back_populates="intents")

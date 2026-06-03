@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...db.session import get_session
-from ...elastic.client import ElasticsearchClient
+from app.db.session import get_session
+from app.elastic.client import ElasticsearchClient
 
 router = APIRouter(prefix="/health", tags=["health"])
 

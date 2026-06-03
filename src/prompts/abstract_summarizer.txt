@@ -1,0 +1,2 @@
+Summarize the following generated sections concisely to provide context for the next writer.
+Keep the main points and key terminology.

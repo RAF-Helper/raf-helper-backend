@@ -2,8 +2,8 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..repositories.postgres_repository import UserRepository
-from ..db.models import User
+from app.repositories.postgres_repository import UserRepository
+from app.db.models import User
 
 
 class UserService:

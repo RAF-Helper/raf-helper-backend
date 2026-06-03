@@ -10,8 +10,8 @@ from alembic import command
 from uuid import uuid4
 import logging
 
-from .models import Base
-from ..config import settings
+from app.db.models import Base
+from app.config import settings
 
 # SQLAlchemy async engine
 engine = create_async_engine(

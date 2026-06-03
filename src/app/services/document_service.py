@@ -6,14 +6,14 @@ from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..config import settings
-from ..db.models import FileMetadata
-from ..repositories.postgres_repository import FileMetadataRepository, ChatContextRepository
-from ..repositories.document_repository import DocumentRepository
-from ..repositories.elasticsearch_repository import ElasticsearchRepository
-from ..services.embedding_service import get_embedding_service
-from ..services.chunking_service import ChunkingService
-from ..parsers import PDFParser, DocxParser, PptxParser, TextParser, MdParser
+from app.config import settings
+from app.db.models import FileMetadata
+from app.repositories.postgres_repository import FileMetadataRepository, ChatContextRepository
+from app.repositories.document_repository import DocumentRepository
+from app.repositories.elasticsearch_repository import ElasticsearchRepository
+from app.services.embedding_service import get_embedding_service
+from app.services.chunking_service import ChunkingService
+from app.parsers import PDFParser, DocxParser, PptxParser, TextParser, MdParser
 
 _PARSERS = {
     "application/pdf": PDFParser(),

@@ -1,3 +1,3 @@
 """Tools package."""
 
-from .search_tools import TOOL_FUNCTIONS
+from app.tools.search_tools import TOOL_FUNCTIONS

@@ -5,8 +5,8 @@ from uuid import uuid4
 
 from pptx import Presentation
 
-from .base import BaseParser
-from ..schemas.document import Document, DocumentChunk, DocumentFormat
+from app.parsers.base import BaseParser
+from app.schemas.document import Document, DocumentChunk, DocumentFormat
 
 class PptxParser(BaseParser[Presentation]):
     """Parser for PowerPoint (.pptx) presentations."""

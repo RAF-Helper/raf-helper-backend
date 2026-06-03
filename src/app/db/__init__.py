@@ -1,6 +1,6 @@
 """Database package."""
 
-from .session import (
+from app.db.session import (
     engine,
     AsyncSessionLocal,
     Base,
@@ -8,7 +8,7 @@ from .session import (
     init_db,
     close_db,
 )
-from .models import User, Chat, ChatMessage, FileMetadata, ChatContext
+from app.db.models import User, Chat, ChatMessage, FileMetadata, ChatContext
 
 __all__ = [
     "engine",

@@ -5,7 +5,7 @@ from typing import Any, Optional
 
 from tavily import TavilyClient
 
-from ..config import settings
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 

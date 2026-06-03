@@ -4,11 +4,12 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any
 
-from ...config import settings
-from ..state import AgentInput, AgentOutput
-from ...schemas.agent import AgentType
-from ...chat.llm import LLMMessage, BaseLLMClient
-from ...prompt_loader import get_prompt_manager
+from app.config import settings
+from app.chat.state import AgentInput, AgentOutput
+from app.schemas.agent import AgentType
+from app.chat.llm import LLMMessage, BaseLLMClient
+from app.prompt_loader import get_prompt_manager
+from app.tools import TOOL_FUNCTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ class BaseAgent(ABC):
         logger.debug(f"{self.__class__.__name__} initialized")
 
     @abstractmethod
-    async def run(self, inp: AgentInput) -> AgentOutput:
+    async def run(self, inp: AgentInput, **kwargs) -> AgentOutput:
         """Process input and return output."""
         ...
 
@@ -50,6 +51,7 @@ class BaseAgent(ABC):
         use_tools: bool = False,
         file_ids: list[int] | None = None,
         use_web_search: bool = False,
+        session: Any = None,
         **kwargs: Any,
     ) -> str:
         """
@@ -130,7 +132,6 @@ class BaseAgent(ABC):
         if use_tools and self.tools:
             logger.debug(f"Calling LLM with {len(self.tools)} tools")
             # Import tool functions registry here to avoid circular imports
-            from ...tools import TOOL_FUNCTIONS
 
             # Tool execution loop
             while True:
@@ -179,6 +180,8 @@ class BaseAgent(ABC):
                     except Exception as e:
                         logger.error(f"Error executing tool {tool_name}: {e}", exc_info=True)
                         result_str = f"Error: {str(e)}"
+                        if session:
+                            await session.rollback()
 
                     # Append tool result as a message with role "tool" and tool_call_id
                     final_messages.append(LLMMessage(

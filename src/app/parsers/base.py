@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, TypeVar, Generic
 
-from ..schemas.document import Document
+from app.schemas.document import Document
 
 T = TypeVar("T")
 

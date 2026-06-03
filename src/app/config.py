@@ -56,7 +56,12 @@ class Settings(BaseSettings):
     slides_chunk_size: int = Field(default=500, alias="SLIDES_CHUNK_SIZE")
     slides_chunk_overlap: int = Field(default=100, alias="SLIDES_CHUNK_OVERLAP")
 
+    # Routing
+    routing_threshold: float = Field(default=0.7, alias="ROUTING_THRESHOLD")
+    routing_margin: float = Field(default=0.1, alias="ROUTING_MARGIN")
+
     model_config = SettingsConfigDict(
+
         env_file=".env",
         env_file_encoding="utf-8",
         extra="allow",
