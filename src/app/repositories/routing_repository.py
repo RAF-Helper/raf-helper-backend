@@ -2,10 +2,9 @@
 
 import logging
 from typing import Any, Optional
-from sqlalchemy import select, insert, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import Route, Intent
-from pgvector.sqlalchemy import Vector
 
 logger = logging.getLogger(__name__)
 
@@ -30,21 +29,20 @@ class RoutingRepository:
         Perform cosine similarity search for the most similar intents.
         Returns a list of dicts with route_id, score, and text.
         """
-        # To fix "operator does not exist: vector.vector <=> unknown" in Supabase,
-        # we must cast the parameter to the explicit type 'vector.vector'.
-        # We use a raw SQL query but avoid the :: syntax which crashes asyncpg.
-        # instead we use CAST(:vector AS vector.vector)
-
-        query = text("""
-            SELECT route_id, text, 1 - (text_embedding <=> CAST(:vector AS vector.vector)) as score
-            FROM vector.intents
-            ORDER BY text_embedding <=> CAST(:vector AS vector.vector)
-            LIMIT :k
-        """)
-
         try:
-            # Pass the vector as a string to avoid asyncpg array issues
-            # and let the CAST handle the conversion.
+            # CRITICAL: Set search_path to include 'vector' schema.
+            # This ensures the <=> operator is found by PostgreSQL.
+            await self._session.execute(text("SET search_path TO public, vector"))
+
+            # Now we can use the operator without explicit schema qualification
+            # on the operator itself, as it's now in the search path.
+            query = text("""
+                SELECT route_id, text, 1 - (text_embedding <=> :vector::vector) as score
+                FROM vector.intents
+                ORDER BY text_embedding <=> :vector::vector
+                LIMIT :k
+            """)
+
             result = await self._session.execute(query, {
                 "vector": str(query_vector),
                 "k": k

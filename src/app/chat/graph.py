@@ -17,7 +17,7 @@ class GraphState(TypedDict):
     user_message: str
     masked_message: str
     history: list[dict[str, str]]
-    file_ids: list[str]
+    file_ids: list[int]
     use_web_search: bool
     forced_agent: Any
     chosen_agent: str | None
