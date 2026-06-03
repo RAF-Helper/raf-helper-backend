@@ -47,7 +47,7 @@ def upgrade() -> None:
     # Create HNSW index for cosine similarity search
     op.execute("""
         CREATE INDEX idx_intents_embedding ON vector.intents
-        USING hnsw (text_embedding vector_cosine_ops)
+        USING hnsw (text_embedding vector.vector_cosine_ops)
     """)
 
 
