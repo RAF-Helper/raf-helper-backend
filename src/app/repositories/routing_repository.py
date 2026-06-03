@@ -1,85 +1,52 @@
-"""Repository for routing intents using Elasticsearch."""
+"""Repository for routing intents using PostgreSQL pgvector."""
 
 import logging
 from typing import Any, Optional
-
-from ..repositories.elasticsearch_repository import ElasticsearchRepository
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.db.models import Route, Intent
 
 logger = logging.getLogger(__name__)
 
 class RoutingRepository:
-    """Repository for managing and searching routing intents in Elasticsearch."""
+    """Repository for managing and searching routing intents in PostgreSQL using pgvector."""
 
-    INDEX_NAME = "routing_intents"
+    def __init__(self, session: AsyncSession):
+        self._session = session
 
-    def __init__(self):
-        self._es_repo = ElasticsearchRepository()
-
-    async def create_index(self):
-        """Create the routing intents index with appropriate mapping."""
-        mapping = {
-            "settings": {
-                "index": {
-                    "number_of_shards": 1,
-                    "number_of_replicas": 0,
-                }
-            },
-            "mappings": {
-                "properties": {
-                    "route_id": {"type": "keyword"},
-                    "intent_text": {"type": "text"},
-                    "intent_embedding": {
-                        "type": "dense_vector",
-                        "dims": 1024,
-                        "index": True,
-                        "similarity": "cosine",
-                    },
-                }
-            },
-        }
-        # Use the underlying es_repo to create the index
-        # Assuming ElasticsearchRepository has a method to create index or we use the client directly
-        # Since I don't see a create_index in ElasticsearchRepository, I'll use the client.
-        await self._es_repo.client.indices.create(index=self.INDEX_NAME, body=mapping, error_handling="ignore")
-        logger.info(f"Routing index {self.INDEX_NAME} ensured.")
-
-    async def add_intent(self, route_id: str, text: str, embedding: list[float]):
-        """Add a single routing intent to the index."""
-        doc = {
-            "route_id": route_id,
-            "intent_text": text,
-            "intent_embedding": embedding,
-        }
-        await self._es_repo.client.index(index=self.INDEX_NAME, document=doc)
+    async def add_intent(self, route_id: int, text: str, embedding: list[float]):
+        """Add a single routing intent to the database."""
+        new_intent = Intent(
+            route_id=route_id,
+            text=text,
+            text_embedding=embedding
+        )
+        self._session.add(new_intent)
+        await self._session.commit()
 
     async def search_intents(self, query_vector: list[float], k: int = 10) -> list[dict[str, Any]]:
         """
         Perform cosine similarity search for the most similar intents.
-
-        Returns:
-            List of hits containing route_id and score.
+        Returns a list of dicts with route_id, score, and text.
         """
-        query = {
-            "field": "intent_embedding",
-            "query_vector": query_vector,
-            "k": k,
-            "num_candidates": 100,
-        }
-
-        # Use the knn search functionality of ES
-        response = await self._es_repo.client.search(
-            index=self.INDEX_NAME,
-            knn=query,
-            source=["route_id", "intent_text"],
-            size=k
+        stmt = (
+            select(
+                Intent.route_id,
+                Intent.text,
+                (1 - Intent.text_embedding.cosine_distance(query_vector)).label("score")
+            )
+            .order_by(Intent.text_embedding.cosine_distance(query_vector))
+            .limit(k)
         )
 
-        results = []
-        for hit in response["hits"]["hits"]:
-            results.append({
-                "route_id": hit["_source"]["route_id"],
-                "score": hit["_score"],
-                "text": hit["_source"]["intent_text"]
-            })
+        result = await self._session.execute(stmt)
+        rows = result.all()
 
-        return results
+        return [
+            {
+                "route_id": row.route_id,
+                "score": row.score,
+                "text": row.text
+            }
+            for row in rows
+        ]
