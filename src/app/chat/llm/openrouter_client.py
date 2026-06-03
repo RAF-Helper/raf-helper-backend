@@ -16,9 +16,9 @@ from langchain_core.messages import (
 )
 from langchain_core.tools import tool as lc_tool
 from langchain_core.utils.function_calling import convert_to_openai_tool
-from .base_client import BaseLLMClient, LLMResponse, LLMMessage
+from app.chat.llm.base_client import BaseLLMClient, LLMResponse, LLMMessage
 from app.config import settings
-from ...logging_config import log_llm_request, log_llm_response, log_llm_error
+from app.logging_config import log_llm_request, log_llm_response, log_llm_error
 
 logger = logging.getLogger(__name__)
 

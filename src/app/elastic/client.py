@@ -2,7 +2,7 @@
 
 from elasticsearch import AsyncElasticsearch
 
-from ..config import settings
+from app.config import settings
 
 
 class ElasticsearchClient:

@@ -1,5 +1,5 @@
 """PII masking package."""
 
-from .presidio_masker import PIIMasker
+from app.pii.presidio_masker import PIIMasker
 
 __all__ = ["PIIMasker"]

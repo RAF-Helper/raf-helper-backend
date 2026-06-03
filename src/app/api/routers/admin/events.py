@@ -5,10 +5,13 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from elasticsearch import AsyncElasticsearch
 
-from ....elastic.client import get_elasticsearch_client
-from ....repositories.elasticsearch_repository import ElasticsearchRepository
-from ....schemas.events import EventCreate, EventRead, EventUpdate, EventSearchResult
-from ....services.embedding_service import EmbeddingService, get_embedding_service
+from app.api.auth.firebase import verify_firebase_token
+
+from app.elastic.client import get_elasticsearch_client
+from app.repositories.elasticsearch_repository import ElasticsearchRepository
+from app.schemas.events import EventCreate, EventRead, EventUpdate, EventSearchResult
+from app.api.dependencies import get_embedding_service
+from app.services.embedding_service import EmbeddingService
 
 router = APIRouter(prefix="/admin/events", tags=["admin", "events"])
 

@@ -7,8 +7,8 @@ from uuid import uuid4
 
 from docx import Document as DocxDocument
 
-from .base import BaseParser
-from ..schemas.document import Document, DocumentChunk, DocumentFormat
+from app.parsers.base import BaseParser
+from app.schemas.document import Document, DocumentChunk, DocumentFormat
 
 # Regex patterns for heading detection (supports English, Russian, Belarusian)
 # Matches: "1. Introduction", "Глава 1", "Article 2.1", etc.

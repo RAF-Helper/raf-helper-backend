@@ -7,8 +7,8 @@ from pydantic import BaseModel, Field
 
 from app.elastic.index_manager import ensure_indexes
 
-from ....config import settings
-from ....elastic.client import ElasticsearchClient
+from app.config import settings
+from app.elastic.client import ElasticsearchClient
 
 logger = logging.getLogger(__name__)
 

@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from ..schemas.agent import AgentType, SummarizationMode
+from app.schemas.agent import AgentType, SummarizationMode
 
 
 @dataclass

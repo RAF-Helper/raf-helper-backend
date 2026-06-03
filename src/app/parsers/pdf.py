@@ -6,8 +6,8 @@ from uuid import uuid4
 
 import pdfplumber
 
-from .base import BaseParser
-from ..schemas.document import Document, DocumentChunk, DocumentFormat
+from app.parsers.base import BaseParser
+from app.schemas.document import Document, DocumentChunk, DocumentFormat
 
 # Heuristic thresholds
 FONT_SIZE_LEVEL1 = 16.0

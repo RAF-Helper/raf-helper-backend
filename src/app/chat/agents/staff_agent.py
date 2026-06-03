@@ -1,10 +1,10 @@
 """Staff agent implementation - uses Elasticsearch staff-index."""
 
-from .base import BaseAgent
-from ..state import AgentInput, AgentOutput
+from app.chat.agents.base import BaseAgent
+from app.chat.state import AgentInput, AgentOutput
 from app.repositories.elasticsearch_repository import ElasticsearchRepository
-from ...schemas.agent import AgentType
-from ...tools.search_tools import get_staff_documents_def
+from app.schemas.agent import AgentType
+from app.tools.search_tools import get_staff_documents_def
 
 
 class StaffAgent(BaseAgent):

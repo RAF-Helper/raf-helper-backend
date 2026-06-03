@@ -6,11 +6,11 @@ import logging
 from typing import Any, Optional
 from uuid import UUID
 
-from ..elastic.index_manager import CONTEXT_MATERIALS_INDEX
-from ..repositories.elasticsearch_repository import ElasticsearchRepository
-from ..repositories.postgres_repository import FileMetadataRepository
-from ..schemas.document import Document, DocumentChunk
-from ..services.embedding_service import get_embedding_service
+from app.elastic.index_manager import CONTEXT_MATERIALS_INDEX
+from app.repositories.elasticsearch_repository import ElasticsearchRepository
+from app.repositories.postgres_repository import FileMetadataRepository
+from app.schemas.document import Document, DocumentChunk
+from app.services.embedding_service import get_embedding_service
 
 
 class DocumentRepository:

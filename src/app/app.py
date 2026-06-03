@@ -4,20 +4,20 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .config import settings
-from .db.session import init_db, close_db
-from .elastic.client import ElasticsearchClient
-from .elastic.index_manager import ensure_indexes
-from .logging_config import setup_logging
+from app.config import settings
+from app.db.session import init_db, close_db
+from app.elastic.client import ElasticsearchClient
+from app.elastic.index_manager import ensure_indexes
+from app.logging_config import setup_logging
 
 # Routers
-from .api.routers.health import router as health_router
-from .api.routers.auth import router as auth_router
-from .api.routers.files import router as files_router
-from .api.routers.chats import router as chats_router
-from .api.routers.admin.staff import router as admin_staff_router
-from .api.routers.admin.events import router as admin_events_router
-from .api.routers.admin.elastic import router as admin_elastic_router
+from app.api.routers.health import router as health_router
+from app.api.routers.auth import router as auth_router
+from app.api.routers.files import router as files_router
+from app.api.routers.chats import router as chats_router
+from app.api.routers.admin.staff import router as admin_staff_router
+from app.api.routers.admin.events import router as admin_events_router
+from app.api.routers.admin.elastic import router as admin_elastic_router
 import logging
 
 @asynccontextmanager

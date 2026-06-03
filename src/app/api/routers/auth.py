@@ -5,10 +5,10 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...db.session import get_session
-from ...services.user_service import UserService
-from ..auth.firebase import verify_firebase_token
-from ...schemas.user import UserRead
+from app.db.session import get_session
+from app.services.user_service import UserService
+from app.api.auth.firebase import verify_firebase_token
+from app.schemas.user import UserRead
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -27,7 +27,7 @@ async def sync_user(
     # Email was already verified inside verify_firebase_token; fetch it again
     # from the token data stored by the dependency.  We re-verify here to keep
     # the endpoint self-contained.
-    from ...api.auth.firebase import get_firebase_app
+    from app.api.auth.firebase import get_firebase_app
     import firebase_admin.auth as fa
 
     try:

@@ -12,20 +12,20 @@ from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..schemas.agent import AgentType, SummarizationMode
-from .state import AgentInput, AgentOutput
-from .agents.support_agent import SupportAgent
-from .agents.events_agent import EventsAgent
-from .agents.staff_agent import StaffAgent
-from .agents.qa_agent import QAAgent
-from .agents.summarizer_agent import SummarizerAgent
-from .agents.abstract_agent import AbstractAgent
-from .agents.presentation_agent import PresentationAgent
-from ..pii.presidio_masker import PIIMasker
-from .llm import OpenRouterClient, LLMMessage
-from ..services.embedding_service import get_embedding_service
-from ..repositories.routing_repository import RoutingRepository
-from ..config import settings
+from app.schemas.agent import AgentType, SummarizationMode
+from app.chat.state import AgentInput, AgentOutput
+from app.chat.agents.support_agent import SupportAgent
+from app.chat.agents.events_agent import EventsAgent
+from app.chat.agents.staff_agent import StaffAgent
+from app.chat.agents.qa_agent import QAAgent
+from app.chat.agents.summarizer_agent import SummarizerAgent
+from app.chat.agents.abstract_agent import AbstractAgent
+from app.chat.agents.presentation_agent import PresentationAgent
+from app.pii.presidio_masker import PIIMasker
+from app.chat.llm import OpenRouterClient, LLMMessage
+from app.services.embedding_service import get_embedding_service
+from app.repositories.routing_repository import RoutingRepository
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 

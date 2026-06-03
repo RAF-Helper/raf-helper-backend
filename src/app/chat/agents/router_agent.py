@@ -1,8 +1,10 @@
 """Router agent implementation."""
 
-from .base import BaseAgent
-from ..state import AgentInput, AgentOutput
-from ...schemas.agent import AgentType
+import logging
+import json
+from app.chat.agents.base import BaseAgent
+from app.chat.state import AgentInput, AgentOutput
+from app.schemas.agent import AgentType
 
 
 class RouterAgent(BaseAgent):

@@ -1,15 +1,15 @@
 """Repositories package."""
 
-from .base import BaseRepository
-from .postgres_repository import (
+from app.repositories.base import BaseRepository
+from app.repositories.postgres_repository import (
     UserRepository,
     ChatRepository,
     ChatMessageRepository,
     FileMetadataRepository,
     ChatContextRepository,
 )
-from .elasticsearch_repository import ElasticsearchRepository
-from .document_repository import DocumentRepository
+from app.repositories.elasticsearch_repository import ElasticsearchRepository
+from app.repositories.document_repository import DocumentRepository
 
 __all__ = [
     "BaseRepository",

@@ -4,10 +4,12 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from elasticsearch import AsyncElasticsearch
 
-from ....elastic.client import get_elasticsearch_client
-from ....repositories.elasticsearch_repository import ElasticsearchRepository
-from ....schemas.staff import StaffCreate, StaffRead, StaffUpdate, StaffSearchResult
-from ....services.embedding_service import EmbeddingService, get_embedding_service
+from app.elastic.client import get_elasticsearch_client
+from app.repositories.elasticsearch_repository import ElasticsearchRepository
+from app.schemas.staff import StaffCreate, StaffRead, StaffUpdate, StaffSearchResult
+from app.api.auth.firebase import verify_firebase_token
+from app.api.dependencies import get_embedding_service
+from app.services.embedding_service import EmbeddingService
 
 router = APIRouter(prefix="/admin/staff", tags=["admin", "staff"])
 

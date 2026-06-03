@@ -1,9 +1,9 @@
 """Events agent implementation - uses Elasticsearch events-index."""
 
-from .base import BaseAgent
-from ..state import AgentInput, AgentOutput
-from ...schemas.agent import AgentType
-from ...tools.search_tools import get_events_documents_def
+from app.chat.agents.base import BaseAgent
+from app.chat.state import AgentInput, AgentOutput
+from app.schemas.agent import AgentType
+from app.tools.search_tools import get_events_documents_def
 
 
 class EventsAgent(BaseAgent):

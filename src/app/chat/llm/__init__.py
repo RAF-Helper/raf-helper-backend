@@ -1,7 +1,7 @@
 """LLM client package."""
 
-from .base_client import BaseLLMClient, LLMResponse, LLMMessage
-from .openrouter_client import OpenRouterClient, OpenRouterError
+from app.chat.llm.base_client import BaseLLMClient, LLMResponse, LLMMessage
+from app.chat.llm.openrouter_client import OpenRouterClient, OpenRouterError
 
 __all__ = [
     "BaseLLMClient",

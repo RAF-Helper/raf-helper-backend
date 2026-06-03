@@ -3,16 +3,18 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...db.session import get_session
-from ...services.chat_service import ChatService, ChatNotFoundError
-from ...services.user_service import UserService
-from ...services.document_service import DocumentService
-from ..auth.firebase import verify_firebase_token
-from ...schemas.chat import ChatCreate, ChatRead, ChatUpdate
-from ...schemas.message import MessageRead
-from ...schemas.file import FileRead
-from ...schemas.agent import ChatMessageRequest, AgentChatResponse
-from ...chat.orchestrator import Orchestrator
+from app.db.session import get_session
+from app.services.chat_service import ChatService, ChatNotFoundError
+from app.services.user_service import UserService
+from app.services.document_service import DocumentService
+from app.api.auth.firebase import verify_firebase_token
+from app.schemas.chat import ChatCreate, ChatRead, ChatUpdate
+from app.schemas.message import MessageRead
+from app.schemas.file import FileRead
+from app.schemas.agent import ChatMessageRequest, AgentChatResponse
+from app.chat.graph import get_agent_graph
+from app.chat.services import services
+from app.chat.orchestrator import Orchestrator
 
 router = APIRouter(prefix="/chats", tags=["chats"])
 

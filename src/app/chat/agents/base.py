@@ -4,11 +4,11 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any
 
-from ...config import settings
-from ..state import AgentInput, AgentOutput
-from ...schemas.agent import AgentType
-from ...chat.llm import LLMMessage, BaseLLMClient
-from ...prompt_loader import get_prompt_manager
+from app.config import settings
+from app.chat.state import AgentInput, AgentOutput
+from app.schemas.agent import AgentType
+from app.chat.llm import LLMMessage, BaseLLMClient
+from app.prompt_loader import get_prompt_manager
 
 logger = logging.getLogger(__name__)
 

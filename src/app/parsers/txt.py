@@ -2,8 +2,8 @@
 
 from pathlib import Path
 from uuid import uuid4
-from .base import BaseParser
-from ..schemas.document import Document, DocumentChunk, DocumentFormat
+from app.parsers.base import BaseParser
+from app.schemas.document import Document, DocumentChunk, DocumentFormat
 
 class TextParser(BaseParser[str]):
     """Parser for .txt files and as a default fallback."""
