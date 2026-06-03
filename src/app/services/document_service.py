@@ -136,7 +136,7 @@ class DocumentService:
             return False
         return await self.ctx_repo.link_file_to_chat(chat_id, file_id)
 
-    async def unlink_from_chat(self, file_id: int, chat_id: int, user_id: int) -> bool:
+    async def unlink_from_chat(self, file_id: int, chat_id: int) -> bool:
         return await self.ctx_repo.unlink_file_from_chat(chat_id, file_id)
 
     async def get_chat_file_ids(self, chat_id: int) -> list[int]:
