@@ -1,5 +1,7 @@
 """Chat session and messaging endpoints."""
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,15 +20,7 @@ from app.chat.orchestrator import Orchestrator
 
 router = APIRouter(prefix="/chats", tags=["chats"])
 
-_orchestrator: Orchestrator | None = None
-
-
-def get_orchestrator() -> Orchestrator:
-    global _orchestrator
-    if _orchestrator is None:
-        _orchestrator = Orchestrator()
-    return _orchestrator
-
+logger = logging.getLogger(__name__)
 
 async def _resolve_user_id(firebase_uid: str, session: AsyncSession) -> int:
     user = await UserService(session).get_by_firebase_id(firebase_uid)
@@ -127,9 +121,8 @@ async def send_message(
     body: ChatMessageRequest,
     firebase_uid: str = Depends(verify_firebase_token),
     session: AsyncSession = Depends(get_session),
-    orchestrator: Orchestrator = Depends(get_orchestrator),
 ) -> AgentChatResponse:
-    """Send a user message → route through orchestrator → return agent response."""
+    """Send a user message → route through agent graph → return agent response."""
     user_id = await _resolve_user_id(firebase_uid, session)
     svc = ChatService(session)
 
@@ -142,25 +135,48 @@ async def send_message(
     history = await svc.get_history_as_messages(chat_id, user_id, limit=40)
     file_ids = await svc.get_context_file_ids(chat_id)
 
-    result = await orchestrator.process(
-        message=body.message,
-        chat_id=chat_id,
-        user_id=user_id,
-        history=history,
-        file_ids=file_ids,
-        use_web_search=chat.is_web_search_enabled,
-        forced_agent=body.agent,
-        summarization_mode=body.summarization_mode,
-        session=session,
-    )
+    # Use the cached agent graph
+    graph = get_agent_graph()
 
-    msg = await svc.save_message(chat_id, role="assistant", content=result.content)
+    initial_state = {
+        "user_message": body.message,
+        "masked_message": "",
+        "history": history,
+        "file_ids": file_ids,
+        "use_web_search": chat.is_web_search_enabled,
+        "forced_agent": body.agent,
+        "chosen_agent": None,
+        "final_output": None,
+        "agent_metadata": {},
+        "session": session,
+        "metadata": {
+            "chat_id": chat_id,
+            "user_id": user_id,
+            "summarization_mode": body.summarization_mode
+        }
+    }
+
+    try:
+        final_state = await graph.ainvoke(initial_state)
+    except Exception as e:
+        logger.error(f"Graph execution failed: {e}", exc_info=True)
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Agent processing error: {str(e)}"
+        )
+
+    result_content = final_state["final_output"]
+    agent_used = final_state["agent_metadata"].get("agent_used")
+    masked_query = final_state["agent_metadata"].get("masked_query")
+
+    msg = await svc.save_message(chat_id, role="assistant", content=result_content)
     return AgentChatResponse(
         message_id=msg.id,
         chat_id=chat_id,
-        content=result.content,
-        agent_used=result.agent_used,
-        masked_query=result.masked_query,
+        content=result_content,
+        agent_used=agent_used,
+        masked_query=masked_query,
     )
 
 
@@ -178,7 +194,7 @@ async def get_context_files(
     chat = await ChatService(session).get_chat(chat_id, user_id)
     if not chat:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found.")
-    from ...repositories.postgres_repository import ChatContextRepository
+    from app.repositories.postgres_repository import ChatContextRepository
     files = await ChatContextRepository(session).get_files_for_chat(chat_id)
     return [FileRead.model_validate(f) for f in files]
 
