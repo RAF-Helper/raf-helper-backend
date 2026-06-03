@@ -157,10 +157,12 @@ async def send_message(
     }
 
     try:
-        final_state = await graph.ainvoke(initial_state)
+        # Use a savepoint to ensure that a graph failure doesn't roll back the user message
+        async with session.begin_nested():
+            final_state = await graph.ainvoke(initial_state)
     except Exception as e:
         logger.error(f"Graph execution failed: {e}", exc_info=True)
-        await session.rollback()
+        # session.begin_nested() automatically rolls back to the savepoint on exception
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Agent processing error: {str(e)}"
