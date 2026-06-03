@@ -30,63 +30,31 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 class Orchestrator:
-    def __init__(self):
-        llm_client = OpenRouterClient()
-        self._llm = llm_client
+    def __init__(self, services):
+        self._services = services
+        self._llm = services.llm
+        self._pii = services.pii
+        self._embedder = services.embedder
+
         self._agents = {
-            AgentType.support: SupportAgent(llm_client),
-            AgentType.events: EventsAgent(llm_client),
-            AgentType.staff: StaffAgent(llm_client),
-            AgentType.qa: QAAgent(llm_client),
-            AgentType.summarizer: SummarizerAgent(llm_client),
-            AgentType.abstract: AbstractAgent(llm_client),
-            AgentType.presentation: PresentationAgent(llm_client),
+            AgentType.support: SupportAgent(self._llm),
+            AgentType.events: EventsAgent(self._llm),
+            AgentType.staff: StaffAgent(self._llm),
+            AgentType.qa: QAAgent(self._llm),
+            AgentType.summarizer: SummarizerAgent(self._llm),
+            AgentType.abstract: AbstractAgent(self._llm),
+            AgentType.presentation: PresentationAgent(self._llm),
         }
-        self._pii = PIIMasker()
-        self._embedder = get_embedding_service()
-        self._routing_repo = RoutingRepository()
 
-    async def process(
-        self,
-        message: str,
-        chat_id: int,
-        user_id: int,
-        history: list[dict[str, str]],
-        file_ids: list[str],
-        use_web_search: bool,
-        forced_agent: Optional[AgentType],
-        summarization_mode: SummarizationMode,
-        session: AsyncSession,
-    ) -> AgentOutput:
-        masked, spans = await self._pii.mask_text_with_spans(message)
-
-        inp = AgentInput(
-            message=message,
-            masked_message=masked,
-            chat_id=chat_id,
-            user_id=user_id,
-            history=history,
-            file_ids=file_ids,
-            use_web_search=use_web_search,
-            summarization_mode=summarization_mode,
-            forced_agent=forced_agent,
-            pii_spans=spans,
-        )
-
-        agent_type = forced_agent if forced_agent is not None else await self._route(masked)
-        return await self._agents[agent_type].run(inp)
-
-    async def _route(self, query: str) -> AgentType:
-        """Route query using two-stage pipeline: Semantic Search -> LLM Fallback.
-
-        1. Embed query and search for similar intents in Elasticsearch.
-        2. If the top route is confident and unambiguous, route immediately.
-        3. Otherwise, fallback to LLM-based routing.
-        """
+    async def route(self, query: str, session: AsyncSession) -> AgentType:
+        """Route query using two-stage pipeline: Semantic Search -> RouterAgent Fallback."""
         try:
+            # Instantiate repo with request session
+            routing_repo = RoutingRepository(session)
+
             # Stage 1: Semantic Routing
             vector = await self._embedder.embed_text(query)
-            hits = await self._routing_repo.search_intents(vector, k=5)
+            hits = await routing_repo.search_intents(vector, k=5)
 
             if hits:
                 # Aggregate scores by route
@@ -110,55 +78,31 @@ class Orchestrator:
                     logger.info(f"Semantic route found: {r1} (score: {s1:.4f}, margin: {s1-s2:.4f})")
                     return AgentType(r1)
 
-                logger.info(f"Semantic routing ambiguous or low confidence (s1: {s1:.4f}, s2: {s2:.4f}). Falling back to LLM.")
+                logger.info(f"Semantic routing ambiguous or low confidence (s1: {s1:.4f}, s2: {s2:.4f}). Falling back to RouterAgent.")
 
         except Exception as e:
             logger.error(f"Error during semantic routing: {e}", exc_info=True)
+            # IMPORTANT: Rollback the session to clear the failed transaction state
+            # so that subsequent DB calls in the same request don't fail.
+            await session.rollback()
 
-        # Stage 2: LLM Fallback
-        return await self._llm_route(query)
+        # Stage 2: LLM Fallback via RouterAgent
+        from app.chat.agents.router_agent import RouterAgent
+        from app.chat.state import AgentInput
 
-
-    async def _llm_route(self, query: str) -> AgentType:
-        """Ask LLM to pick the best agent for the given query using structured JSON output."""
-        system = (
-            "You are a routing assistant. Based on the user's query, choose the single best agent.\n\n"
-            "Agents:\n"
-            "- support: off-topic questions, questions about the system itself, greetings\n"
-            "- events: university events, competitions, hackathons, bonuses, dates\n"
-            "- staff: faculty staff, professors, who teaches what, room numbers\n"
-            "- qa: questions about uploaded study materials (lectures, books, PDFs)\n"
-            "- summarizer: summarize uploaded materials\n"
-            "- abstract: write an essay/abstract based on materials\n"
-            "- presentation: create a presentation based on materials\n\n"
-            "You must respond in JSON format with a single key 'route' containing the agent slug.\n"
-            "Example: {\"route\": \"qa\"}\n"
-            "One of: support, events, staff, qa, summarizer, abstract, presentation"
+        router = RouterAgent(self._llm)
+        router_inp = AgentInput(
+            message="",
+            masked_message=query,
+            chat_id=0,
+            user_id=0,
+            history=[],
+            file_ids=[],
+            use_web_search=False,
+            summarization_mode=None,
+            forced_agent=None,
+            pii_spans=[],
         )
-        messages = [
-            LLMMessage(role="system", content=system),
-            LLMMessage(role="user", content=query),
-        ]
-        try:
-            # We use a low temperature for deterministic routing
-            response = await self._llm.chat(messages=messages, temperature=0.0, max_tokens=50)
-            content = response.content.strip()
 
-            # Basic JSON extraction in case the LLM adds markdown code blocks
-            if "```json" in content:
-                content = content.split("```json")[1].split("```")[0].strip()
-            elif "```" in content:
-                content = content.split("```")[1].split("```")[0].strip()
-
-            import json
-            data = json.loads(content)
-            chosen = data.get("route", "").strip().lower()
-
-            if chosen in AgentType.__members__:
-                return AgentType(chosen)
-
-            logger.warning(f"LLM returned invalid route: {chosen}. Falling back to QA.")
-            return AgentType.qa
-        except Exception as e:
-            logger.error(f"Error in LLM routing: {e}")
-            return AgentType.qa
+        result = await router.run(router_inp)
+        return AgentType(result.content)
