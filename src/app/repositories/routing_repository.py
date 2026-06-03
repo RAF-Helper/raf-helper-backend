@@ -1,10 +1,10 @@
 """Repository for routing intents using PostgreSQL pgvector."""
 
 import logging
-from typing import Any
-from sqlalchemy import select, cast
+from typing import Any, Optional
+from sqlalchemy import select, insert, text
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.models import Intent
+from app.db.models import Route, Intent
 from pgvector.sqlalchemy import Vector
 
 logger = logging.getLogger(__name__)
@@ -30,32 +30,34 @@ class RoutingRepository:
         Perform cosine similarity search for the most similar intents.
         Returns a list of dicts with route_id, score, and text.
         """
-        # Use the fully qualified type name vector.vector to match Supabase schema
-        # Since pgvector.sqlalchemy.Vector might map to 'vector', we use a raw cast if needed
-        # or ensure the cast uses the correct schema.
-        from sqlalchemy import text as sa_text
+        # We use the SQLAlchemy expression API instead of raw text to avoid placeholder conflicts.
+        # pgvector.sqlalchemy's cosine_distance handles the operator correctly.
+        # To ensure the cast to vector.vector happens correctly in Supabase:
 
-        # We use raw SQL for the distance calculation to ensure the type cast '::vector'
-        # works correctly with the schema.
-        query = sa_text("""
-            SELECT route_id, text, 1 - (text_embedding <=> :vector::vector) as score
-            FROM vector.intents
-            ORDER BY text_embedding <=> :vector::vector
-            LIMIT :k
-        """)
+        stmt = (
+            select(
+                Intent.route_id,
+                Intent.text,
+                (1 - Intent.text_embedding.cosine_distance(query_vector)).label("score")
+            )
+            .order_by(Intent.text_embedding.cosine_distance(query_vector))
+            .limit(k)
+        )
 
-        result = await self._session.execute(query, {
-            "vector": str(query_vector),
-            "k": k
-        })
+        try:
+            result = await self._session.execute(stmt)
+            rows = result.all()
 
-        rows = result.all()
-
-        return [
-            {
-                "route_id": row[0],
-                "score": row[2],
-                "text": row[1]
-            }
-            for row in rows
-        ]
+            return [
+                {
+                    "route_id": row.route_id,
+                    "score": row.score,
+                    "text": row.text
+                }
+                for row in rows
+            ]
+        except Exception as e:
+            logger.error(f"Error searching intents: {e}")
+            # If the above fails, we can try a raw query with a different casting method
+            # as a fallback, but the SQLAlchemy expression is the correct way.
+            raise
