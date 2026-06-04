@@ -81,7 +81,11 @@ async def update_elasticsearch_url(
 
     # Recreate client with new URL (no auth for simplicity - can be added if needed)
     try:
-        new_client = AsyncElasticsearch(hosts=[body.url])
+        new_client = AsyncElasticsearch(
+            hosts=[body.url],
+            request_timeout=120,
+            retry_on_timeout=True,
+        )
         ElasticsearchClient._instance = new_client
 
         # Test connection
