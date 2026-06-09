@@ -21,6 +21,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    networks:
+      local_network:
 
   postgresql:
     image: pgvector/pgvector:pg17
@@ -41,6 +43,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     mem_limit: 256m
+    networks:
+      local_network:
 
   backend:
     build:
@@ -70,12 +74,29 @@ services:
     networks:
       ipv6_special_network:
         ipv6_address: fd00:1234:5678::10
+      local_network:
     develop:
       watch:
         - action: rebuild
           path: ./src
           ignore:
             - src/**/__pycache__/
+
+  admin-ui:
+    build:
+      context: .
+      dockerfile: dockerfile.frontend
+      network: host
+    environment:
+      - SERVICE_URL=${SERVICE_URL}
+      - ADMIN_UI_PASSWORD=${ADMIN_UI_PASSWORD}
+    ports:
+      - "8501:8501"
+    depends_on:
+      backend:
+        condition: service_started
+    networks:
+      local_network:
 
 volumes:
   postgres_data:
@@ -89,3 +110,5 @@ networks:
     ipam:
       config:
         - subnet: fd00:1234:5678::/64
+  local_network:
+    driver: bridge

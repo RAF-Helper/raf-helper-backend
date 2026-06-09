@@ -26,7 +26,6 @@ def _get_repo(es: AsyncElasticsearch = Depends(get_elasticsearch_client)) -> Ela
 @router.post("/", response_model=StaffRead, status_code=status.HTTP_201_CREATED)
 async def create_staff(
     body: StaffCreate,
-    firebase_uid: str = Depends(verify_firebase_token),
     repo: ElasticsearchRepository = Depends(_get_repo),
     embedder: EmbeddingService = Depends(get_embedding_service),
 ) -> StaffRead:
@@ -55,7 +54,6 @@ async def search_staff(
     position: Optional[str] = Query(default=None),
     room: Optional[str] = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
-    firebase_uid: str = Depends(verify_firebase_token),
     repo: ElasticsearchRepository = Depends(_get_repo),
 ) -> list[StaffSearchResult]:
     """Full-text (BM25 + optional kNN) staff search.
@@ -70,7 +68,6 @@ async def search_staff(
 @router.get("/{doc_id}", response_model=StaffRead)
 async def get_staff(
     doc_id: str,
-    firebase_uid: str = Depends(verify_firebase_token),
     repo: ElasticsearchRepository = Depends(_get_repo),
 ) -> StaffRead:
     doc = await repo.get_staff(doc_id)
@@ -83,7 +80,6 @@ async def get_staff(
 async def update_staff(
     doc_id: str,
     body: StaffUpdate,
-    firebase_uid: str = Depends(verify_firebase_token),
     repo: ElasticsearchRepository = Depends(_get_repo),
     embedder: EmbeddingService = Depends(get_embedding_service),
 ) -> StaffRead:
@@ -108,7 +104,6 @@ async def update_staff(
 @router.delete("/{doc_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_staff(
     doc_id: str,
-    firebase_uid: str = Depends(verify_firebase_token),
     repo: ElasticsearchRepository = Depends(_get_repo),
 ) -> None:
     deleted = await repo.delete_staff(doc_id)
