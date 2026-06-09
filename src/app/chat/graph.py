@@ -9,6 +9,8 @@ from app.chat.state import AgentInput, AgentOutput
 from app.schemas.agent import AgentType
 from app.chat.orchestrator import Orchestrator
 from app.chat.services import services
+import json
+from app.services.export_service import export_service
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +81,7 @@ async def abstract_planner_node(state: GraphState) -> dict:
     )
 
     output = await agent.run(inp)
-    import json
+    
     try:
         outline = json.loads(output.content)
     except:
@@ -145,7 +147,7 @@ async def abstract_summarizer_node(state: GraphState) -> dict:
     return {"iteration_summary": output.content}
 
 async def abstract_finalizer_node(state: GraphState) -> dict:
-    from app.services.export_service import export_service
+    
     final_text = "\n\n".join(state["accumulated_content"])
 
     # Export to LaTeX
@@ -176,7 +178,7 @@ async def presentation_planner_node(state: GraphState) -> dict:
     )
 
     output = await agent.run(inp)
-    import json
+    
     try:
         outline = json.loads(output.content)
     except:
@@ -242,7 +244,7 @@ async def presentation_summarizer_node(state: GraphState) -> dict:
     return {"iteration_summary": output.content}
 
 async def presentation_finalizer_node(state: GraphState) -> dict:
-    from app.services.export_service import export_service
+    
     content_list = state["accumulated_content"]
 
     # Parse the generated content into slides
