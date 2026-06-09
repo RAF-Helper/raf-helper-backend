@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     # OpenRouter
     openrouter_api_key: str = Field(default="", alias="OPENROUTER_API_KEY")
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
-    openrouter_model: str = "google/gemma-4-31b-it:free"
+    openrouter_model: str = "google/gemma-4-31b-it"
 
     # Tavily (web search)
     tavily_api_key: str = Field(default="", alias="TAVILY_API_KEY")
