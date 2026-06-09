@@ -27,6 +27,8 @@ from app.chat.llm import OpenRouterClient, LLMMessage
 from app.services.embedding_service import get_embedding_service
 from app.repositories.routing_repository import RoutingRepository
 from app.config import settings
+from app.chat.agents.router_agent import RouterAgent
+from app.chat.state import AgentInput
 
 logger = logging.getLogger(__name__)
 
@@ -87,10 +89,6 @@ class Orchestrator:
             # IMPORTANT: Rollback the session to clear the failed transaction state
             # so that subsequent DB calls in the same request don't fail.
             await session.rollback()
-
-        # Stage 2: LLM Fallback via RouterAgent
-        from app.chat.agents.router_agent import RouterAgent
-        from app.chat.state import AgentInput
 
         router = RouterAgent(self.router_llm)
         router_inp = AgentInput(
