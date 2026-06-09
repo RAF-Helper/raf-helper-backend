@@ -17,7 +17,7 @@ if [ -d ".venv" ]; then
 fi
 
 # Run Streamlit
-streamlit run src/app/chat/test_ui/admin/panel.py \
+streamlit run src/test_ui/admin/panel.py \
     --server.port $PORT \
     --server.address 0.0.0.0 \
     --browser.gatherUsageStats false \
