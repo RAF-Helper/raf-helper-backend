@@ -7,6 +7,25 @@ from typing import Optional
 import streamlit as st
 import httpx
 
+def check_password():
+    """Simple Streamlit authentication."""
+    def password_entered():
+        if st.session_state["password"] == os.getenv("ADMIN_UI_PASSWORD", "admin123"):
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # don't store password
+        else:
+            st.session_state["password_correct"] = False
+
+    if "password_correct" not in st.session_state:
+        st.text_input("Password", type="password", on_change=password_entered, key="password")
+        return False
+    elif not st.session_state["password_correct"]:
+        st.text_input("Password", type="password", on_change=password_entered, key="password")
+        st.error("😕 Password incorrect")
+        return False
+    else:
+        return True
+
 # Configuration
 SERVICE_URL = os.getenv("SERVICE_URL", "http://localhost:8000")
 API_PREFIX = "/admin"
@@ -401,6 +420,9 @@ def events_tab():
 
 
 def main():
+    if not check_password():
+        st.stop()
+
     st.title("🔧 RAF Helper — Admin Panel")
     st.markdown("---")
     st.info(f"🌐 Backend API: `{SERVICE_URL}`")
