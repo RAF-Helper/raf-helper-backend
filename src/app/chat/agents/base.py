@@ -132,10 +132,12 @@ class BaseAgent(ABC):
         # Select calling method based on tools
         if use_tools and self.tools:
             logger.debug(f"Calling LLM with {len(self.tools)} tools")
-            # Import tool functions registry here to avoid circular imports
 
-            # Tool execution loop
-            while True:
+            # Tool execution loop with max iterations guard
+            max_iterations = kwargs.pop("max_tool_iterations", 10)
+            iteration = 0
+            while iteration < max_iterations:
+                iteration += 1
                 response = await self.llm_client.chat_with_tools(
                     messages=final_messages,
                     tools=self.tools,
@@ -197,6 +199,12 @@ class BaseAgent(ABC):
                     ))
 
                 # Continue loop: LLM will process tool results and produce final answer
+
+            # Max iterations exceeded without receiving a final response
+            raise RuntimeError(
+                f"Tool execution exceeded max iterations ({max_iterations}). "
+                "The LLM continued requesting tool calls without producing a final answer."
+            )
         else:
             response = await self.llm_client.chat(
                 messages=final_messages,

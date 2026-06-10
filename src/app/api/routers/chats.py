@@ -153,7 +153,13 @@ async def send_message(
             "chat_id": chat_id,
             "user_id": user_id,
             "summarization_mode": body.summarization_mode
-        }
+        },
+        "plan_outline": None,
+        "current_step": 0,
+        "accumulated_content": [],
+        "iteration_summary": None,
+        "reviewer_passed": False,
+        "review_attempts": 0,
     }
 
     try:

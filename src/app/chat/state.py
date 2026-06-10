@@ -17,9 +17,8 @@ class AgentInput:
     history: list[dict[str, str]]          # [{"role": ..., "content": ...}]
     file_ids: list[int]                    # Document IDs in chat context
     use_web_search: bool
-    summarization_mode: SummarizationMode
-    forced_agent: Optional[AgentType]
-    extra: dict[str, Any] = field(default_factory=dict)
+    summarization_mode: Optional[SummarizationMode] = None
+    forced_agent: Optional[AgentType] = None
     pii_spans: list[dict] = field(default_factory=list)  # PII spans from mask_text_with_spans
 
 

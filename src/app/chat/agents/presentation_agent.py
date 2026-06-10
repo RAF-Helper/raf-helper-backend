@@ -26,6 +26,13 @@ class PresentationAgent(BaseAgent):
         self.reviewer = SlidesReviewerAgent(llm_client)
 
     async def run(self, inp: AgentInput) -> AgentOutput:
+        """Run the presentation agent.
+
+        Note: The sub-agents (planner, slider, summarizer, reviewer) are NOT invoked
+        by this method. The iterative slide generation pipeline is driven entirely
+        by the LangGraph state machine in graph.py, which accesses these sub-agents
+        directly via _shared_orchestrator._agents[AgentType.presentation].*
+        """
         template = self._load_prompt("presentation_agent")
         system_prompt = template.format(query=inp.masked_message)
 

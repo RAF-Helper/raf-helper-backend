@@ -99,9 +99,6 @@ class Orchestrator:
             history=[],
             file_ids=[],
             use_web_search=False,
-            summarization_mode=None,
-            forced_agent=None,
-            pii_spans=[],
         )
 
         result = await router.run(router_inp)
