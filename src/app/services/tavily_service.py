@@ -57,6 +57,7 @@ class TavilyService:
                     "raw_content": item.get("raw_content", None),
                 })
 
+            logger.info(f"Tavily found {len(results)} results for query: '{query}'")
             return results
 
         except Exception as e:

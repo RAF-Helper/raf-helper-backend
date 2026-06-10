@@ -181,7 +181,7 @@ class BaseAgent(ABC):
                         else:
                             logger.info(f"Executing tool [{tool_name}] with args: {tool_args}")
                             result = await func(**tool_args)
-                            logger.info(f"Tool [{tool_name}] returned: {str(result)[:500]}...")
+                            logger.info(f"Tool [{tool_name}] returned: {str(result)}...")
                         result_str = str(result)
                     except Exception as e:
                         logger.error(f"Error executing tool {tool_name}: {e}", exc_info=True)
