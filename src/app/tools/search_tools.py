@@ -53,7 +53,7 @@ async def list_context_files(
             # Use file_repo directly via doc_service
             files = await doc_service.file_repo.get_by_ids(file_ids)
 
-            lines = ["Files in the current chat context:"]
+            lines = ["[Список доступных для чтения файлов]"]
             for f in files:
                 lines.append(f"- ID: {f.id}, Name: {f.original_name}")
 

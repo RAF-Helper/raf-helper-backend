@@ -24,7 +24,7 @@ class SupportAgent(BaseAgent):
 
         response = await self._call_llm(
             system_prompt=prompt,
-            temperature=0.7,
+            temperature=0.5,
         )
 
         return AgentOutput(

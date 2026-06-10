@@ -25,7 +25,7 @@ class EventsAgent(BaseAgent):
             system_prompt=system_prompt,
             user_prompt=inp.masked_message,
             history=inp.history,
-            temperature=0.7,
+            temperature=0.5,
             use_tools=True,
         )
 

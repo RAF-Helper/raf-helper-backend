@@ -55,7 +55,7 @@ class StaffAgent(BaseAgent):
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             history=inp.history,
-            temperature=0.7,
+            temperature=0.5,
             use_tools=True,
         )
 

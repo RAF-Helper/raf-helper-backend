@@ -42,7 +42,7 @@ class SummarizerAgent(BaseAgent):
             system_prompt=system_prompt,
             user_prompt=inp.masked_message,
             history=inp.history[-10:] if inp.history else [],
-            temperature=0.7,
+            temperature=0.4,
             use_tools=True,
             file_ids=inp.file_ids,
             use_web_search=inp.use_web_search,
