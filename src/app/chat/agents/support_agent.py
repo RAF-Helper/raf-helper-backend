@@ -16,14 +16,13 @@ class SupportAgent(BaseAgent):
 
     async def run(self, inp: AgentInput) -> AgentOutput:
         """Process general support queries."""
-        # Build prompt with context
         prompt = self._format_prompt(
             query=inp.masked_message,
-            history=inp.history[-10:] if inp.history else [],
         )
 
         response = await self._call_llm(
             system_prompt=prompt,
+            history=inp.history[-10:] if inp.history else [],
             temperature=0.5,
         )
 
