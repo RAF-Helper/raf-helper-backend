@@ -18,6 +18,7 @@ class MessageRead(BaseModel):
     role: MessageRole
     content: str
     agent_used: Optional[str] = None
+    export_path: Optional[str] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

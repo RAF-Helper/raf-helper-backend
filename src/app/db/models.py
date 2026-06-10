@@ -56,6 +56,7 @@ class ChatMessage(Base):
     role = Column(String(16), nullable=False)  # user | assistant | system
     content = Column(Text, nullable=False)
     agent_used = Column(String(64), nullable=True)
+    export_path = Column(String(4096), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     chat = relationship("Chat", back_populates="messages")

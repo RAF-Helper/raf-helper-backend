@@ -69,8 +69,8 @@ class ChatService:
     async def save_user_message(self, chat_id: int, content: str) -> ChatMessage:
         return await self.msg_repo.create_message(chat_id, role="user", content=content)
 
-    async def save_message(self, chat_id: int, role: str, content: str) -> ChatMessage:
-        return await self.msg_repo.create_message(chat_id, role=role, content=content)
+    async def save_message(self, chat_id: int, role: str, content: str, export_path: str | None = None) -> ChatMessage:
+        return await self.msg_repo.create_message(chat_id, role=role, content=content, export_path=export_path)
 
     # ------------------------------------------------------------------ #
     # Context files                                                         #
