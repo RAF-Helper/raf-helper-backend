@@ -21,6 +21,7 @@ jobs:
           echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env
           echo "ELASTICSEARCH_UPDATE_PASSWORD=${{ secrets.ELASTICSEARCH_UPDATE_PASSWORD }}" >> .env
           echo "FIREBASE_CREDENTIALS_PATH=${{ secrets.FIREBASE_CREDENTIALS_PATH }}" >> .env
+          echo "TAVILY_API_KEY=${{ secrets.TAVILY_API_KEY }}" >> .env
           echo "DEBUG=false" >> .env
           echo "HF_TOKEN=${{ secrets.HF_TOKEN }}" >> .env
 
