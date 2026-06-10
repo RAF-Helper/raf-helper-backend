@@ -214,7 +214,7 @@ async def get_materials_fragments(
                         # Results are full documents: list[dict] with 'name', 'content'
                         for r in results:
                             lines.append(
-                                f"Document {r['name']} ({r['document_id']}):\n{r['content']}"
+                                f"Document {r['name']}:\n{r['content']}"
                             )
                     internal_content = "\n\n".join(lines)
         except Exception as e:
