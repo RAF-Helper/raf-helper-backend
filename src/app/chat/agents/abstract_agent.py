@@ -1,4 +1,4 @@
-"""Abstract agent - generates abstracts (subagents: planner, writer, summarizer)."""
+"""Abstract agent - generates abstracts (subagents: planner, writer, summarizer, reviewer)."""
 
 import logging
 
@@ -21,6 +21,7 @@ class AbstractAgent(BaseAgent):
         self.planner = PlannerAgent(llm_client)
         self.writer = ChapterWriterAgent(llm_client)
         self.summarizer = ChapterSummarizerAgent(llm_client)
+        self.reviewer = ChapterReviewerAgent(llm_client)
 
     async def run(self, inp: AgentInput) -> AgentOutput:
         """This method is primarily used as a stub; iterative logic is in the graph."""
@@ -94,6 +95,24 @@ class ChapterSummarizerAgent(BaseAgent):
             system_prompt=system_prompt,
             user_prompt=inp.masked_message,
             temperature=0.3
+        )
+
+        return AgentOutput(content=response, agent_used=self.agent_type, masked_query=inp.masked_message)
+
+
+class ChapterReviewerAgent(BaseAgent):
+    """Reviews generated chapters for quality, coherence, and completeness."""
+
+    agent_type = AgentType.abstract
+    prompt_name = "abstract_reviewer"
+
+    async def run(self, inp: AgentInput) -> AgentOutput:
+        system_prompt = self._load_prompt(self.prompt_name)
+
+        response = await self._call_llm(
+            system_prompt=system_prompt,
+            user_prompt=inp.masked_message,
+            temperature=0.3,
         )
 
         return AgentOutput(content=response, agent_used=self.agent_type, masked_query=inp.masked_message)

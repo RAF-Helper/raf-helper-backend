@@ -150,7 +150,7 @@ async def abstract_summarizer_node(state: GraphState) -> dict:
     return {"iteration_summary": output.content}
 
 async def abstract_finalizer_node(state: GraphState) -> dict:
-    
+
     final_text = "\n\n".join(state["accumulated_content"])
 
     # Export to LaTeX
@@ -161,6 +161,54 @@ async def abstract_finalizer_node(state: GraphState) -> dict:
         "final_output": f"{final_text}\n\n--- Exported to LaTeX: {filepath} ---",
         "agent_metadata": {"agent_used": "abstract", "masked_query": state["masked_message"], "export_path": filepath}
     }
+
+
+async def abstract_reviewer_node(state: GraphState) -> dict:
+    """Review all generated sections for quality and coherence."""
+    agent = _shared_orchestrator._agents[AgentType.abstract].reviewer
+
+    content_to_review = "\n\n".join(state["accumulated_content"]) if state["accumulated_content"] else ""
+
+    inp = AgentInput(
+        message=state["user_message"],
+        masked_message=content_to_review,
+        chat_id=state["metadata"].get("chat_id"),
+        user_id=state["metadata"].get("user_id"),
+        history=state["history"],
+        file_ids=state["file_ids"],
+        use_web_search=state["use_web_search"],
+        summarization_mode=state["metadata"].get("summarization_mode"),
+        forced_agent=state["forced_agent"],
+        pii_spans=state["metadata"].get("pii_spans"),
+    )
+
+    output = await agent.run(inp)
+
+    attempts = state.get("review_attempts", 0) + 1
+
+    try:
+        review = json.loads(output.content)
+        if review.get("approved"):
+            return {"reviewer_passed": True, "review_attempts": attempts}
+
+        has_revisions = review.get("revised_sections") and len(review["revised_sections"]) > 0
+        if has_revisions and attempts < 3:
+            revised_content = [
+                f"## {section.get('title', 'Section')}\n\n{section.get('content', '')}"
+                for section in review["revised_sections"]
+            ]
+            return {
+                "accumulated_content": revised_content,
+                "reviewer_passed": False,
+                "review_attempts": attempts,
+            }
+
+        logger.warning("ChapterReviewer could not fix issues, proceeding to finalizer")
+    except Exception as e:
+        logger.error(f"Failed to parse reviewer response: {e}")
+
+    return {"reviewer_passed": True, "review_attempts": attempts}
+
 
 # --- Iterative Nodes for Presentation Agent ---
 
@@ -388,7 +436,15 @@ def should_continue_abstract(state: GraphState) -> str:
             return "abstract_summarizer_node"
         return "abstract_writer_node"
 
-    return "abstract_finalizer_node"
+    # All chapters written — route to reviewer
+    return "abstract_reviewer_node"
+
+def should_continue_abstract_review(state: GraphState) -> str:
+    """Conditional edge after abstract review."""
+    if state.get("reviewer_passed", False):
+        return "abstract_finalizer_node"
+    # Not approved — re-route to writer for fixes
+    return "abstract_writer_node"
 
 def should_continue_presentation(state: GraphState) -> str:
     """Conditional edge to determine if more slides need to be created."""
@@ -427,6 +483,7 @@ def build_agent_graph():
     workflow.add_node("abstract_planner_node", abstract_planner_node)
     workflow.add_node("abstract_writer_node", abstract_writer_node)
     workflow.add_node("abstract_summarizer_node", abstract_summarizer_node)
+    workflow.add_node("abstract_reviewer_node", abstract_reviewer_node)
     workflow.add_node("abstract_finalizer_node", abstract_finalizer_node)
 
     # Presentation Pipeline Nodes
@@ -465,10 +522,18 @@ def build_agent_graph():
         {
             "abstract_writer_node": "abstract_writer_node",
             "abstract_summarizer_node": "abstract_summarizer_node",
-            "abstract_finalizer_node": "abstract_finalizer_node",
+            "abstract_reviewer_node": "abstract_reviewer_node",
         }
     )
     workflow.add_edge("abstract_summarizer_node", "abstract_writer_node")
+    workflow.add_conditional_edges(
+        "abstract_reviewer_node",
+        should_continue_abstract_review,
+        {
+            "abstract_writer_node": "abstract_writer_node",
+            "abstract_finalizer_node": "abstract_finalizer_node",
+        }
+    )
     workflow.add_edge("abstract_finalizer_node", END)
 
     # Presentation Iterative Flow

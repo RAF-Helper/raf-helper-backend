@@ -13,6 +13,7 @@ from app.chat.agents.abstract_agent import (
     PlannerAgent,
     ChapterWriterAgent,
     ChapterSummarizerAgent,
+    ChapterReviewerAgent,
 )
 from app.chat.agents.presentation_agent import (
     PresentationAgent,
@@ -34,6 +35,7 @@ __all__ = [
     "PlannerAgent",
     "ChapterWriterAgent",
     "ChapterSummarizerAgent",
+    "ChapterReviewerAgent",
     "PresentationAgent",
     "SlidePlannerAgent",
     "SliderAgent",
