@@ -32,6 +32,9 @@ class GraphState(TypedDict):
     current_step: int
     accumulated_content: list[str]
     iteration_summary: str | None
+    # Reviewer fields
+    reviewer_passed: bool
+    review_attempts: int
 
 # Shared Orchestrator instance for routing and agent access
 _shared_orchestrator = Orchestrator(services)
@@ -244,10 +247,10 @@ async def presentation_summarizer_node(state: GraphState) -> dict:
     return {"iteration_summary": output.content}
 
 async def presentation_finalizer_node(state: GraphState) -> dict:
-    
+
     content_list = state["accumulated_content"]
 
-    # Parse the generated content into slides
+    # If the reviewer already parsed and approved slides, use those directly
     slides = []
     for item in content_list:
         if "--- Slide" in item:
@@ -268,6 +271,55 @@ async def presentation_finalizer_node(state: GraphState) -> dict:
         "final_output": f"{final_text}\n\n--- Exported to PPTX: {filepath} ---",
         "agent_metadata": {"agent_used": "presentation", "masked_query": state["masked_message"], "export_path": filepath}
     }
+
+
+async def presentation_reviewer_node(state: GraphState) -> dict:
+    """Review all generated slides for quality and consistency."""
+    agent = _shared_orchestrator._agents[AgentType.presentation].reviewer
+
+    content_to_review = "\n\n".join(state["accumulated_content"]) if state["accumulated_content"] else ""
+
+    inp = AgentInput(
+        message=state["user_message"],
+        masked_message=content_to_review,
+        chat_id=state["metadata"].get("chat_id"),
+        user_id=state["metadata"].get("user_id"),
+        history=state["history"],
+        file_ids=state["file_ids"],
+        use_web_search=state["use_web_search"],
+        summarization_mode=state["metadata"].get("summarization_mode"),
+        forced_agent=state["forced_agent"],
+        pii_spans=state["metadata"].get("pii_spans"),
+    )
+
+    output = await agent.run(inp)
+
+    attempts = state.get("review_attempts", 0) + 1
+
+    try:
+        review = json.loads(output.content)
+        if review.get("approved"):
+            return {"reviewer_passed": True, "review_attempts": attempts}
+
+        has_revisions = review.get("revised_slides") and len(review["revised_slides"]) > 0
+        # If there are revised slides and we haven't exceeded max attempts, apply fixes
+        if has_revisions and attempts < 3:
+            revised_content = [
+                f"--- Slide {i+1}: {slide.get('title', 'Untitled')} ---\n\n{slide.get('content', '')}"
+                for i, slide in enumerate(review["revised_slides"])
+            ]
+            return {
+                "accumulated_content": revised_content,
+                "reviewer_passed": False,
+                "review_attempts": attempts,
+            }
+
+        # No valid revisions and not approved — push through to finalizer anyway
+        logger.warning("SlidesReviewer could not fix issues, proceeding to finalizer")
+    except Exception as e:
+        logger.error(f"Failed to parse reviewer response: {e}")
+
+    return {"reviewer_passed": True, "review_attempts": attempts}
 
 # Node: Agent Execution
 async def _execute_agent(state: GraphState, agent_type: AgentType) -> dict:
@@ -348,7 +400,15 @@ def should_continue_presentation(state: GraphState) -> str:
             return "presentation_summarizer_node"
         return "presentation_slider_node"
 
-    return "presentation_finalizer_node"
+    # All slides written — route to reviewer
+    return "presentation_reviewer_node"
+
+def should_continue_presentation_review(state: GraphState) -> str:
+    """Conditional edge after slide review."""
+    if state.get("reviewer_passed", False):
+        return "presentation_finalizer_node"
+    # Not approved — re-route to slider for fixes
+    return "presentation_slider_node"
 
 def build_agent_graph():
     """Build and compile the LangGraph state machine."""
@@ -373,6 +433,7 @@ def build_agent_graph():
     workflow.add_node("presentation_planner_node", presentation_planner_node)
     workflow.add_node("presentation_slider_node", presentation_slider_node)
     workflow.add_node("presentation_summarizer_node", presentation_summarizer_node)
+    workflow.add_node("presentation_reviewer_node", presentation_reviewer_node)
     workflow.add_node("presentation_finalizer_node", presentation_finalizer_node)
 
     # Define Edges
@@ -418,10 +479,18 @@ def build_agent_graph():
         {
             "presentation_slider_node": "presentation_slider_node",
             "presentation_summarizer_node": "presentation_summarizer_node",
-            "presentation_finalizer_node": "presentation_finalizer_node",
+            "presentation_reviewer_node": "presentation_reviewer_node",
         }
     )
     workflow.add_edge("presentation_summarizer_node", "presentation_slider_node")
+    workflow.add_conditional_edges(
+        "presentation_reviewer_node",
+        should_continue_presentation_review,
+        {
+            "presentation_slider_node": "presentation_slider_node",
+            "presentation_finalizer_node": "presentation_finalizer_node",
+        }
+    )
     workflow.add_edge("presentation_finalizer_node", END)
 
     return workflow.compile()

@@ -1,5 +1,6 @@
-"""Presentation agent - generates presentations (subagents: planner, slider)."""
+"""Presentation agent - generates presentations (subagents: planner, slider, reviewer)."""
 
+import json
 import logging
 
 from app.chat.agents.base import BaseAgent
@@ -22,6 +23,7 @@ class PresentationAgent(BaseAgent):
         self.planner = SlidePlannerAgent(llm_client)
         self.slider = SliderAgent(llm_client)
         self.summarizer = SlideSummarizerAgent(llm_client)
+        self.reviewer = SlidesReviewerAgent(llm_client)
 
     async def run(self, inp: AgentInput) -> AgentOutput:
         template = self._load_prompt("presentation_agent")
@@ -111,6 +113,24 @@ class SlideSummarizerAgent(BaseAgent):
             system_prompt=system_prompt,
             user_prompt=inp.masked_message,
             temperature=0.3
+        )
+
+        return AgentOutput(content=response, agent_used=self.agent_type, masked_query=inp.masked_message)
+
+
+class SlidesReviewerAgent(BaseAgent):
+    """Reviews generated slides for quality, consistency, and completeness."""
+
+    agent_type = AgentType.presentation
+    prompt_name = "slides_reviewer"
+
+    async def run(self, inp: AgentInput) -> AgentOutput:
+        system_prompt = self._load_prompt(self.prompt_name)
+
+        response = await self._call_llm(
+            system_prompt=system_prompt,
+            user_prompt=inp.masked_message,
+            temperature=0.3,
         )
 
         return AgentOutput(content=response, agent_used=self.agent_type, masked_query=inp.masked_message)

@@ -19,6 +19,7 @@ from app.chat.agents.presentation_agent import (
     SlidePlannerAgent,
     SliderAgent,
     SlideSummarizerAgent,
+    SlidesReviewerAgent,
 )
 
 __all__ = [
@@ -37,4 +38,5 @@ __all__ = [
     "SlidePlannerAgent",
     "SliderAgent",
     "SlideSummarizerAgent",
+    "SlidesReviewerAgent",
 ]
