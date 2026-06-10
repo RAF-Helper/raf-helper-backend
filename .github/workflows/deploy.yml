@@ -25,6 +25,7 @@ jobs:
           echo "DEBUG=false" >> .env
           echo "ELASTICSEARCH_URL=${{ secrets.ELASTICSEARCH_URL }}" >> .env
           echo "HF_TOKEN=${{ secrets.HF_TOKEN }}" >> .env
+          echo "EMBEDDING_PROVIDER=${{ secrets.EMBEDDING_PROVIDER }}" >> .env
 
           echo '${{ secrets.FIREBASE_CREDENTIALS }}' > firebase-credentials.json
 
