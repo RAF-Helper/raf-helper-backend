@@ -177,6 +177,7 @@ async def send_message(
     result_content = final_state["final_output"]
     agent_used = final_state["agent_metadata"].get("agent_used")
     masked_query = final_state["agent_metadata"].get("masked_query")
+    export_path = final_state["agent_metadata"].get("export_path")
 
     msg = await svc.save_message(chat_id, role="assistant", content=result_content)
     return AgentChatResponse(
@@ -185,6 +186,7 @@ async def send_message(
         content=result_content,
         agent_used=agent_used,
         masked_query=masked_query,
+        export_path=export_path,
     )
 
 

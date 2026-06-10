@@ -42,3 +42,4 @@ class AgentChatResponse(BaseModel):
     content: str
     agent_used: AgentType
     masked_query: Optional[str] = None
+    export_path: Optional[str] = None

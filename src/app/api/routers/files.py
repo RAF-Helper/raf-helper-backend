@@ -1,8 +1,11 @@
 """File upload and management endpoints."""
 
 import logging
+import os
+import re
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
@@ -11,6 +14,7 @@ from app.schemas.document import DocumentSearchRequest, DocumentChunk
 from app.services.user_service import UserService
 from app.api.auth.firebase import verify_firebase_token
 from app.schemas.file import FileRead, FileUploadResponse
+from app.config import settings
 
 router = APIRouter(prefix="/files", tags=["files"])
 
@@ -120,3 +124,74 @@ async def delete_file(
     deleted = await svc.delete_file(file_id, user_id)
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found.")
+
+
+_EXPORT_STORAGE = os.path.join(settings.storage_path, "..", "exports")
+_EXPORT_STORAGE = os.path.normpath(_EXPORT_STORAGE)
+
+# Only these are allowed for download — .pptx and .tex for now
+_ALLOWED_EXPORT_EXTENSIONS = (".pptx", ".tex")
+
+# Map extension → MIME type for the Content-Disposition header
+_EXTENSION_MIME = {
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".tex": "application/x-latex",
+}
+
+
+@router.get("/exports/{filename:path}")
+async def download_export(
+    filename: str,
+    firebase_uid: str = Depends(verify_firebase_token),
+    session: AsyncSession = Depends(get_session),
+):
+    """Download a previously generated export file (abstract .tex or presentation .pptx).
+
+    The filename format is ``<type>_<chat_id>.<ext>`` (e.g. ``abstract_42.tex`` or
+    ``presentation_42.pptx``).  The endpoint verifies that the requesting user owns
+    the chat that produced the file before serving it.
+    """
+    user_id = await _resolve_user_id(firebase_uid, session)
+
+    # 1. Validate filename — avoid path traversal
+    basename = os.path.basename(filename)
+    if not re.match(r"^(abstract|presentation)_\d+\.(tex|pptx)$", basename):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid export filename format.",
+        )
+
+    ext = os.path.splitext(basename)[1]
+    if ext not in _ALLOWED_EXPORT_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported file extension: {ext}",
+        )
+
+    # 2. Check file exists
+    filepath = os.path.join(_EXPORT_STORAGE, basename)
+    if not os.path.isfile(filepath):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Export file not found.",
+        )
+
+    # 3. Verify ownership — parse chat_id from filename and check it belongs to user
+    match = re.match(r"^(abstract|presentation)_(\d+)\.", basename)
+    chat_id = int(match.group(2))
+
+    from app.services.chat_service import ChatService
+    chat = await ChatService(session).get_chat(chat_id, user_id)
+    if not chat:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this export file.",
+        )
+
+    mime = _EXTENSION_MIME.get(ext, "application/octet-stream")
+    return FileResponse(
+        path=filepath,
+        media_type=mime,
+        filename=basename,
+        headers={"Content-Disposition": f'attachment; filename="{basename}"'},
+    )
