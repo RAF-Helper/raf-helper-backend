@@ -144,10 +144,19 @@ class DocumentService:
         return [f.id for f in files]
 
     async def get_full_document_text(self, document_id: str) -> str:
-        """Retrieve full text of a document by re-parsing it from storage."""
+        """Retrieve full text of a document, using cache if available, otherwise re-parsing it from storage."""
         file_record = await self.file_repo.get_by_uuid(document_id)
         if not file_record:
             return ""
+
+        # 1. Check for cached text file (<document_id>.txt)
+        # Cached files are stored in the same user directory as the original file
+        cache_path = Path(file_record.path).parent / f"{document_id}.txt"
+        if cache_path.exists():
+            try:
+                return cache_path.read_text(encoding="utf-8")
+            except Exception as e:
+                logging.error(f"Error reading cached text for {document_id}: {e}")
 
         parser = _PARSERS.get(file_record.mime_type, _PARSERS["text/plain"])
 
@@ -158,6 +167,13 @@ class DocumentService:
 
             # Concatenate all chunk contents
             full_text = "\n".join([chunk.content for chunk in document.document_chunks])
+
+            # 2. Cache the result for future use
+            try:
+                cache_path.write_text(full_text, encoding="utf-8")
+            except Exception as e:
+                logging.warning(f"Could not write cache for {document_id}: {e}")
+
             return full_text
         except Exception as e:
             logging.error(f"Error re-parsing document {document_id} from {file_record.path}: {e}")
