@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_model: str = "google/gemma-4-31b-it"
 
+    # Embeddings
+    embedding_provider: str = Field(default="local", alias="EMBEDDING_PROVIDER")
+    embedding_model: str = Field(default="bge-m3", alias="EMBEDDING_MODEL")
+
     # Tavily (web search)
     tavily_api_key: str = Field(default="", alias="TAVILY_API_KEY")
 

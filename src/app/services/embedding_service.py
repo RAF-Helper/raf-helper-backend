@@ -1,126 +1,166 @@
-"""Embedding service using sentence-transformers (local ML model)."""
+"""Embedding service with support for multiple providers (Local, OpenRouter)."""
 
 import asyncio
 import logging
+from abc import ABC, abstractmethod
 from functools import lru_cache
 
+import httpx
 from sentence_transformers import SentenceTransformer
+
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Model choices
-SUPPORTED_MODELS = {
+# Model choices for local provider
+SUPPORTED_LOCAL_MODELS = {
     "bge-m3": "BAAI/bge-m3",  # Multilingual, 1024 dims
-    "bge-small": "BAAI/bge-small-en-v1.5",  # English, 384 dims (but we need multilingual)
+    "bge-small": "BAAI/bge-small-en-v1.5",  # English, 384 dims
     "paraphrase-multilingual": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",  # 384 dims
 }
 
-DEFAULT_MODEL = "bge-m3"
+
+class EmbeddingProvider(ABC):
+    """Abstract base class for embedding providers."""
+
+    @abstractmethod
+    async def embed_text(self, text: str) -> list[float]:
+        """Generate embedding for a single text string."""
+        pass
+
+    @abstractmethod
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        """Generate embeddings for multiple texts in a single batch."""
+        pass
 
 
-# Global singleton instance (lazy-loaded)
-@lru_cache()
-def get_embedding_service() -> "EmbeddingService":
-    """Get or create the global embedding service instance."""
-    return EmbeddingService()
+class LocalEmbeddingProvider(EmbeddingProvider):
+    """Local embedding provider using sentence-transformers."""
 
-
-class EmbeddingService:
-    """Generates embeddings for text using sentence-transformers.
-
-    This is a local embedding service - models are loaded into memory and run on CPU.
-    No external API calls are made.
-
-    Note: sentence-transformers is synchronous and CPU-bound. We run it in a
-    thread pool to avoid blocking the event loop in async contexts.
-    """
-
-    def __init__(self, model_name: str = DEFAULT_MODEL):
-        """
-        Initialize the embedding service with a sentence-transformers model.
-
-        Args:
-            model_name: Model identifier. Options:
-                - "bge-m3" (default) - BAAI/bge-m3, multilingual, 1024 dims
-                - "paraphrase-multilingual" - 384 dims, smaller/faster
-
-        Note: The model will be downloaded on first use (~1.4GB for bge-m3).
-        """
+    def __init__(self, model_name: str):
         self.model_name = model_name
         self._model: SentenceTransformer | None = None
-        logger.info(f"EmbeddingService initialized with model={model_name} (lazy-loaded)")
 
     @property
     def model(self) -> SentenceTransformer:
-        """Lazy-load the model on first use."""
         if self._model is None:
-            hf_name = SUPPORTED_MODELS.get(self.model_name, self.model_name)
-            logger.info(f"Loading sentence-transformers model: {hf_name}")
+            hf_name = SUPPORTED_LOCAL_MODELS.get(self.model_name, self.model_name)
+            logger.info(f"Loading local sentence-transformers model: {hf_name}")
             self._model = SentenceTransformer(hf_name)
-            logger.info(f"Model loaded successfully")
+            logger.info("Local model loaded successfully")
         return self._model
 
     async def embed_text(self, text: str) -> list[float]:
-        """
-        Generate embedding for a single text string.
-
-        Args:
-            text: Input text to embed (should be in Russian or multilingual content)
-
-        Returns:
-            Vector embedding as list of floats (1024 dims for bge-m3)
-        """
         if not text.strip():
             raise ValueError("Cannot embed empty text")
 
         try:
-            # Run synchronous encode in thread pool to avoid blocking event loop
             loop = asyncio.get_running_loop()
             embedding = await loop.run_in_executor(
                 None, lambda: self.model.encode(text, convert_to_numpy=False)
             )
-            # Convert from numpy to list if needed
             if hasattr(embedding, "tolist"):
                 embedding = embedding.tolist()
-            logger.debug(f"Generated embedding for text length={len(text)}")
             return list(embedding)
         except Exception as e:
-            logger.error(f"Failed to generate embedding: {e}")
+            logger.error(f"Local embedding failed: {e}")
             raise
 
     async def embed_batch(self, texts: list[str]) -> list[list[float]]:
-        """
-        Generate embeddings for multiple texts in a single batch.
-
-        Args:
-            texts: List of input texts
-
-        Returns:
-            List of embedding vectors, one per input text
-        """
         if not texts:
             return []
 
-        # Filter out empty texts while preserving order
         valid_texts = [t for t in texts if t.strip()]
         if not valid_texts:
             return []
 
         try:
-            # Run batch encoding in thread pool
             loop = asyncio.get_running_loop()
             embeddings = await loop.run_in_executor(
                 None, lambda: self.model.encode(valid_texts, convert_to_numpy=False)
             )
-            # Convert from numpy arrays to lists
             results = []
             for emb in embeddings:
                 if hasattr(emb, "tolist"):
                     results.append(emb.tolist())
                 else:
                     results.append(list(emb))
-            logger.debug(f"Generated {len(results)} embeddings (batch)")
             return results
         except Exception as e:
-            logger.error(f"Failed to generate batch embeddings: {e}")
+            logger.error(f"Local batch embedding failed: {e}")
             raise
+
+
+class OpenRouterEmbeddingProvider(EmbeddingProvider):
+    """Embedding provider using OpenRouter API."""
+
+    def __init__(self, model_name: str):
+        self.model_name = model_name
+        self.api_key = settings.openrouter_api_key
+        self.base_url = f"{settings.openrouter_base_url}/embeddings"
+
+    async def embed_text(self, text: str) -> list[float]:
+        return (await self.embed_batch([text]))[0]
+
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        if not texts:
+            return []
+
+        if not self.api_key:
+            raise ValueError("OpenRouter API key is not configured")
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    self.base_url,
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": self.model_name,
+                        "input": texts,
+                    },
+                )
+                response.raise_for_status()
+                data = response.json()
+
+                # OpenRouter typically follows OpenAI embeddings format:
+                # { "data": [ { "embedding": [...], ... }, ... ] }
+                embeddings = [item["embedding"] for item in data["data"]]
+                return embeddings
+        except Exception as e:
+            logger.error(f"OpenRouter embedding failed: {e}")
+            raise
+
+
+class EmbeddingService:
+    """Coordinator for embedding providers."""
+
+    def __init__(self):
+        provider_type = settings.embedding_provider.lower()
+        model_name = settings.embedding_model
+
+        if provider_type == "openrouter":
+            self.provider = OpenRouterEmbeddingProvider(model_name)
+            logger.info(f"EmbeddingService initialized with OpenRouter provider (model={model_name})")
+        elif provider_type == "local":
+            self.provider = LocalEmbeddingProvider(model_name)
+            logger.info(f"EmbeddingService initialized with Local provider (model={model_name})")
+        else:
+            logger.warning(f"Unknown embedding provider '{provider_type}', falling back to local")
+            self.provider = LocalEmbeddingProvider(model_name)
+
+    async def embed_text(self, text: str) -> list[float]:
+        """Generate embedding for a single text string."""
+        return await self.provider.embed_text(text)
+
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        """Generate embeddings for multiple texts in a single batch."""
+        return await self.provider.embed_batch(texts)
+
+
+@lru_cache()
+def get_embedding_service() -> "EmbeddingService":
+    """Get or create the global embedding service instance."""
+    return EmbeddingService()
