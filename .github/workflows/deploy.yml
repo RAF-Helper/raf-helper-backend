@@ -23,6 +23,7 @@ jobs:
           echo "FIREBASE_CREDENTIALS_PATH=${{ secrets.FIREBASE_CREDENTIALS_PATH }}" >> .env
           echo "TAVILY_API_KEY=${{ secrets.TAVILY_API_KEY }}" >> .env
           echo "DEBUG=false" >> .env
+          echo "ELASTICSEARCH_URL=${{ secrets.ELASTICSEARCH_URL }}" >> .env
           echo "HF_TOKEN=${{ secrets.HF_TOKEN }}" >> .env
 
           echo '${{ secrets.FIREBASE_CREDENTIALS }}' > firebase-credentials.json
