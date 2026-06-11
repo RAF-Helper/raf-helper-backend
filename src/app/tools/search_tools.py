@@ -130,8 +130,8 @@ async def get_staff_documents(
 async def get_events_documents(
     query: str,
     bonus_amount: Optional[int] = None,
-    date_from: Optional[datetime] = None,
-    date_to: Optional[datetime] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     k: int = 3,
 ) -> str:
     """
@@ -144,6 +144,9 @@ async def get_events_documents(
     embedder = _get_embedder()
 
     vector = await embedder.embed_text(query)
+
+    date_from = datetime.fromisoformat(date_from)
+    date_to = datetime.fromisoformat(date_to)
 
     results = await repo.search_events(
         query=query,
