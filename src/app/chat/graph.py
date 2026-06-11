@@ -434,7 +434,38 @@ async def support_node(state: GraphState) -> dict:
     return await _execute_agent(state, AgentType.support)
 
 async def events_node(state: GraphState) -> dict:
-    return await _execute_agent(state, AgentType.events)
+    import datetime
+    current_date = datetime.date.today().strftime("%Y-%m-%d")
+
+    # We modify the masked_message to include the current date, allowing the LLM
+    # to properly calculate date_from and date_to parameters for the tool call.
+    date_context = f"Today's date is {current_date}. "
+    modified_message = date_context + state["masked_message"]
+
+    agent = _shared_orchestrator._agents[AgentType.events]
+
+    inp = AgentInput(
+        message=state["user_message"],
+        masked_message=modified_message,
+        chat_id=state["metadata"].get("chat_id"),
+        user_id=state["metadata"].get("user_id"),
+        history=state["history"],
+        file_ids=state["file_ids"],
+        use_web_search=state["use_web_search"],
+        summarization_mode=state["metadata"].get("summarization_mode"),
+        forced_agent=state["forced_agent"],
+        pii_spans=state["metadata"].get("pii_spans"),
+    )
+
+    output = await agent.run(inp)
+
+    return {
+        "final_output": output.content,
+        "agent_metadata": {
+            "agent_used": output.agent_used,
+            "masked_query": output.masked_query
+        }
+    }
 
 async def staff_node(state: GraphState) -> dict:
     return await _execute_agent(state, AgentType.staff)
