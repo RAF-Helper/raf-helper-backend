@@ -1,2 +1,2 @@
-Summarize the following generated sections concisely to provide context for the next writer.
-Keep the main points and key terminology.
+Кратко суммируй следующие сгенерированные разделы, чтобы предоставить контекст для следующего автора.
+Сохраняй основные тезисы и ключевую терминологию.

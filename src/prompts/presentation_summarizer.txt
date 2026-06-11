@@ -1,1 +1,1 @@
-Summarize the previous slides concisely to maintain flow and avoid repetition in the next slide.
+Кратко суммируй предыдущие слайды, чтобы сохранить плавность повествования и избежать повторов в следующем слайде.
