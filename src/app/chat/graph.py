@@ -150,15 +150,31 @@ async def abstract_summarizer_node(state: GraphState) -> dict:
     return {"iteration_summary": output.content}
 
 async def abstract_finalizer_node(state: GraphState) -> dict:
-
     final_text = "\n\n".join(state["accumulated_content"])
 
     # Export to LaTeX
     filename = f"abstract_{state['metadata'].get('chat_id', 'unknown')}"
     filepath = export_service.export_latex(filename, final_text)
 
+    # Generate a brief summary for the chat
+    summarizer = _shared_orchestrator._agents[AgentType.abstract].summarizer
+    summary_inp = AgentInput(
+        message=state["user_message"],
+        masked_message=f"Provide a brief 2-3 sentence summary of the following abstract for a user chat message:\n\n{final_text}",
+        chat_id=state["metadata"].get("chat_id"),
+        user_id=state["metadata"].get("user_id"),
+        history=state["history"],
+        file_ids=state["file_ids"],
+        use_web_search=state["use_web_search"],
+        summarization_mode=state["metadata"].get("summarization_mode"),
+        forced_agent=state["forced_agent"],
+        pii_spans=state["metadata"].get("pii_spans"),
+    )
+    summary_output = await summarizer.run(summary_inp)
+    chat_summary = summary_output.content
+
     return {
-        "final_output": f"{final_text}\n\n--- Exported to LaTeX: {filepath} ---",
+        "final_output": f"{chat_summary}\n\n--- Full abstract exported to LaTeX: {filepath} ---",
         "agent_metadata": {"agent_used": "abstract", "masked_query": state["masked_message"], "export_path": filepath}
     }
 
@@ -314,9 +330,26 @@ async def presentation_finalizer_node(state: GraphState) -> dict:
     filename = f"presentation_{state['metadata'].get('chat_id', 'unknown')}"
     filepath = export_service.export_pptx(filename, slides)
 
-    final_text = "\n\n".join(content_list)
+    # Generate a brief summary for the chat
+    full_text = "\n\n".join(content_list)
+    summarizer = _shared_orchestrator._agents[AgentType.presentation].summarizer
+    summary_inp = AgentInput(
+        message=state["user_message"],
+        masked_message=f"Provide a brief 2-3 sentence summary of the following presentation content (slides) for a user chat message:\n\n{full_text}",
+        chat_id=state["metadata"].get("chat_id"),
+        user_id=state["metadata"].get("user_id"),
+        history=state["history"],
+        file_ids=state["file_ids"],
+        use_web_search=state["use_web_search"],
+        summarization_mode=state["metadata"].get("summarization_mode"),
+        forced_agent=state["forced_agent"],
+        pii_spans=state["metadata"].get("pii_spans"),
+    )
+    summary_output = await summarizer.run(summary_inp)
+    chat_summary = summary_output.content
+
     return {
-        "final_output": f"{final_text}\n\n--- Exported to PPTX: {filepath} ---",
+        "final_output": f"{chat_summary}\n\n--- Full presentation exported to PPTX: {filepath} ---",
         "agent_metadata": {"agent_used": "presentation", "masked_query": state["masked_message"], "export_path": filepath}
     }
 
