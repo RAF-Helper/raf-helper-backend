@@ -14,12 +14,15 @@ class ElasticsearchClient:
     def get(cls) -> AsyncElasticsearch:
         """Get or create Elasticsearch client instance."""
         if cls._instance is None:
+            auth = None
+            if settings.elasticsearch_username and settings.elasticsearch_password:
+                auth = (settings.elasticsearch_username, settings.elasticsearch_password)
+
             cls._instance = AsyncElasticsearch(
                 hosts=[settings.elasticsearch_url],
+                basic_auth=auth,
                 request_timeout=120,
                 retry_on_timeout=True,
-                # Add authentication if needed
-                # basic_auth=("username", "password") if settings.elasticsearch_username else None,
             )
         return cls._instance
 

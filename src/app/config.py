@@ -23,6 +23,14 @@ class Settings(BaseSettings):
         default="http://localhost:9200",
         alias="ELASTICSEARCH_URL",
     )
+    elasticsearch_username: str = Field(
+        default="",
+        alias="ELASTICSEARCH_USERNAME",
+    )
+    elasticsearch_password: str = Field(
+        default="",
+        alias="ELASTICSEARCH_PASSWORD",
+    )
     elasticsearch_update_password: str = Field(
         default="",
         alias="ELASTICSEARCH_UPDATE_PASSWORD",
