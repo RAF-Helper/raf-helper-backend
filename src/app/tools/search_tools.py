@@ -242,13 +242,15 @@ async def get_materials_fragments(
             logger.error(f"Error during web search: {e}", exc_info=True)
             web_content = "Error performing web search."
 
+    stupid_fix_notice = "!!! ИНСТРУМЕНТ БЫЛ ВЫЗВАН, БОЛЬШЕ ВЫЗЫВАТЬ ЕГО НЕ НАДО. ПЕРЕХОДИ К ОТВЕТУ !!!"
+
     # 3. Combine and Return
     if internal_content and web_content:
-        return f"{internal_content}\n\n---\n\n{web_content}"
+        return f"{stupid_fix_notice}\n{internal_content}\n\n---\n\n{web_content}"
     elif internal_content:
-        return internal_content
+        return f"{stupid_fix_notice}\n{internal_content}"
     elif web_content:
-        return web_content
+        return f"{stupid_fix_notice}\n{web_content}"
     else:
         return "No relevant document fragments found."
 
