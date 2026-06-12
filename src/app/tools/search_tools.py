@@ -128,7 +128,7 @@ async def get_staff_documents(
 
 
 async def get_events_documents(
-    query: str,
+    query: Optional[str],
     bonus_amount: Optional[int] = None,
     date_from: Optional[datetime] = None,
     date_to: Optional[datetime] = None,
@@ -143,11 +143,11 @@ async def get_events_documents(
     repo = _get_repo()
     embedder = _get_embedder()
 
-    vector = await embedder.embed_text(query)
-
     if isinstance(date_from, str): date_from = datetime.fromisoformat(date_from)
     if isinstance(date_to, str): date_to = datetime.fromisoformat(date_to)
 
+    vector = await embedder.embed_text(query) if query else None
+    
     results = await repo.search_events(
         query=query,
         bonus_amount=bonus_amount,
@@ -323,7 +323,7 @@ get_events_documents_def = {
         "properties": {
             "query": {
                 "type": "string",
-                "description": "Search query (e.g., 'hackathon', 'programming contest')"
+                "description": "Optional search query (e.g., 'hackathon', 'programming contest'), omit if searching generic events"
             },
             "bonus_amount": {
                 "type": "integer",
