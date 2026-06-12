@@ -134,9 +134,9 @@ class ElasticsearchRepository:
             position: Optional filter by exact position match
             room: Optional filter by room number
         """
-        must: list[dict] = []
+        should: list[dict] = []
         if query:
-            must.append({
+            should.append({
                 "multi_match": {
                     "query": query,
                     "fields": [
@@ -157,20 +157,20 @@ class ElasticsearchRepository:
             filter_.append({"term": {"room": room}})
 
         # Build hybrid query: bool with optional knn in should clause
-        es_query: dict[str, Any] = {"bool": {"must": must, "filter": filter_}}
+        es_query: dict[str, Any] = {"bool": {"should": should, "filter": filter_}}
 
         if query_vector:
             # Add kNN as a boosting clause
-            es_query["bool"]["should"] = [
-                {
-                    "knn": {
-                        "field": "description_vector",
-                        "query_vector": query_vector,
-                        "k": min(50, limit * 2),  # kNN candidates
-                        "num_candidates": min(100, limit * 4),
-                    }
+            if "should" not in es_query["bool"]:
+                es_query["bool"]["should"] = []
+            es_query["bool"]["should"].append({
+                "knn": {
+                    "field": "description_vector",
+                    "query_vector": query_vector,
+                    "k": min(50, limit * 2),  # kNN candidates
+                    "num_candidates": min(100, limit * 4),
                 }
-            ]
+            })
 
         return await self.search(STAFF_INDEX, es_query, size=limit)
 
@@ -234,7 +234,7 @@ class ElasticsearchRepository:
 
     async def search_events(
         self,
-        query: str,
+        query: Optional[str] = None,
         date_from: Optional[datetime] = None,
         date_to: Optional[datetime] = None,
         bonus_amount: Optional[int] = None,
@@ -247,9 +247,9 @@ class ElasticsearchRepository:
             query_vector: embedding of *query* for semantic re-ranking.
             bonus_amount: Minimum bonus amount filter (inclusive).
         """
-        must: list[dict] = []
+        should: list[dict] = []
         if query:
-            must.append({
+            should.append({
                 "multi_match": {
                     "query": query,
                     "fields": [
@@ -272,19 +272,20 @@ class ElasticsearchRepository:
             filter_.append({"range": {"bonus_amount": {"gte": bonus_amount}}})
 
         # Build hybrid query: bool with optional knn
-        es_query: dict[str, Any] = {"bool": {"must": must, "filter": filter_}}
+        es_query: dict[str, Any] = {"bool": {"should": should, "filter": filter_}}
 
         if query_vector:
-            es_query["bool"]["should"] = [
-                {
-                    "knn": {
-                        "field": "description_vector",
-                        "query_vector": query_vector,
-                        "k": min(50, limit * 2),
-                        "num_candidates": min(100, limit * 4),
-                    }
+            # Add kNN as a boosting clause
+            if "should" not in es_query["bool"]:
+                es_query["bool"]["should"] = []
+            es_query["bool"]["should"].append({
+                "knn": {
+                    "field": "description_vector",
+                    "query_vector": query_vector,
+                    "k": min(50, limit * 2),
+                    "num_candidates": min(100, limit * 4),
                 }
-            ]
+            })
 
         return await self.search(EVENTS_INDEX, es_query, size=limit)
 
